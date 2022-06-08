@@ -1,7 +1,5 @@
 import matplotlib.pyplot as plt
 
-from src.limpid.layer import Layer
-from src.limpid.implantation import MakhovProfile
 from src.limpid.limpid import Sample
 import numpy as np
 
@@ -22,8 +20,6 @@ dataset = np.transpose(np.genfromtxt(filepath, delimiter=","))
 e_data = dataset[0][dataset[0]>2]
 s_data = dataset[1][-len(e_data):]
 ds_data = dataset[3][-len(e_data):]
-
-energy = np.linspace(e_data[0], e_data[-1], 100)
 
 sample = Sample(layers=[w])
 
