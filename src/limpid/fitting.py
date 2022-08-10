@@ -1,6 +1,7 @@
+import numpy as np
+
 from scipy.optimize import least_squares as least_squares_scipy
 from scipy.linalg import svd
-import numpy as np
 
 # Wrapper for scipy's least_squares. Inspired by lmfit.
 
@@ -31,6 +32,7 @@ class FitParameter:
         self.vary = vary
         self.min = min
         self.max = max
+        self.precision = 8  # floating point precision in digits, used for rounding in the terminal print-out.
 
     def __str__(self):
         """
@@ -41,8 +43,9 @@ class FitParameter:
         string
         """
 
-        final = self.name + ": " + str(self.value) + ", vary: " + str(self.vary) + ", min: " + str(
-            self.min) + ", max: " + str(self.max)
+        final = self.name + ": " + str(round(self.value, self.precision)) \
+                + ", vary: " + str(self.vary) \
+                + ", min: " + str(self.min) + ", max: " + str(self.max)
 
         return final
 
@@ -69,9 +72,11 @@ class ResultParameter:
         Initial value used in fitting procedure.
     stderr : float
         stderr from covariance matrix.
+    precision : int
+        Floating Point precision (in digits). Used for rounding in print-out.
     """
 
-    def __init__(self, name, value, vary, mn, mx, init, stderr):
+    def __init__(self, name, value, vary, mn, mx, init, stderr, precision=8):
         self.name = name
         self.value = value
         self.vary = vary
@@ -79,6 +84,7 @@ class ResultParameter:
         self.max = mx
         self.init = init
         self.stderr = stderr
+        self.precision = precision
 
     def __str__(self):
         """
@@ -92,8 +98,10 @@ class ResultParameter:
         if self.vary:
             fixed_vary_str = ""
 
-        final = self.name + ": " + str(self.value) + " +/- " + str(self.stderr) + " ( init: " + str(
-            self.init) + fixed_vary_str + " )"
+        final = self.name + ": " + str(round(self.value, self.precision)) + " +/- " \
+                + str(round(self.stderr, self.precision)) \
+                + " ( init: " + str(round(self.init, self.precision)) \
+                + fixed_vary_str + " )"
 
         return final
 
@@ -286,7 +294,7 @@ class Fit:
         self.parameters = parameters
         self.result = FitResult()
 
-    def least_squares(self, method='trf', verbose=0):
+    def least_squares(self, method='trf', verbose=0, precision=8, max_nfev=100):
         """
         Wrapper of scipy's least_squares function, which is based on MINPACK.
 
@@ -301,17 +309,26 @@ class Fit:
             1 : display a termination report.
             2 : display progress during iterations (not supported by ‘lm’ method).
 
+        precision : int
+            Floating Point precision (in digits). Used for fitting procedure and rounding in print-out.
+
+
         Returns
         -------
         FitResult
         """
 
         parameters_vary_name = []
+        all_parameter_names = []
         initial_condition = []
         lower_bound = []
         upper_bound = []
 
         for parameter in self.parameters.dict:
+            all_parameter_names.append(parameter)
+
+            self.parameters[parameter].precision = precision
+
             self.result.add(self.parameters.dict[parameter], self.parameters.dict[parameter].value, 0)
 
             if self.parameters.dict[parameter].vary:
@@ -341,9 +358,12 @@ class Fit:
 
             return self.func(self.parameters)
 
-        result_lq = least_squares_scipy(residual_wrapper, initial_condition, jac='2-point', bounds=bounds, method=method, verbose=verbose)
+        prec_exp = 10**(-precision)
 
-        # copied from scipy curve_fit
+        result_lq = least_squares_scipy(residual_wrapper, initial_condition, jac='2-point', bounds=bounds, method=method,
+                                        ftol=prec_exp, xtol=prec_exp, gtol=prec_exp, verbose=verbose, max_nfev=max_nfev)
+
+        # marked section below was copied from scipy curve_fit
         # ----------------------------
         # Do Moore-Penrose inverse discarding zero singular values.
         _, s, VT = svd(result_lq.jac, full_matrices=False)
@@ -362,6 +382,8 @@ class Fit:
             self.result.pcov_names.append(name)
 
         self.result.nfev = result_lq.nfev
+        self.result.status = result_lq.status
+        self.result.active_mask = result_lq.active_mask
         self.result.pcov = pcov
         self.result.chi_sqr = 2 * result_lq.cost  # least_squares in scipy works with half chi-squared loss
 
@@ -375,13 +397,46 @@ class FitResult:
 
     def __init__(self):
         self.nfev = None
+        self.status = -2  # the return values for 'status' from scipy least_squares start at -1
+        self.active_mask = None  # label for each fitted parameters, (0: no constraint, -1: lower bound, 1: upper bound)
         self.chi_sqr = None
         self.pcov = None
         self.pcov_names = []
         self.result_parameters = {}
-        self.str = "Fit Result:\n"
+        self.str = "\nFit Result:\n"
+        """
+        The precision is set to None by default, and is later set to the smallest precision of the parameters. The 
+        precision is only used for the terminal print-out.
+        """
+        self.precision = None
 
-    def add(self, parameter, init, stderr):
+    def __iter__(self):
+        """
+        Class iterator.
+
+        Returns
+        -------
+
+        """
+        return iter(self.result_parameters)
+
+    def __getitem__(self, name):
+        """
+        Returns ResultParameter.
+
+        Parameters
+        ----------
+        name : str
+            Name of the ResultParameter
+
+        Returns
+        -------
+        FitParameter
+        """
+
+        return self.result_parameters[name]
+
+    def add(self, parameter: FitParameter, init, stderr):
         """
         Add a FitParameter object with the respective init and stderr values,
         this is than combined into a new ResultParameter object.
@@ -405,7 +460,18 @@ class FitResult:
                                                                   parameter.min,
                                                                   parameter.max,
                                                                   init,
-                                                                  stderr))
+                                                                  stderr,
+                                                                  parameter.precision))
+
+        """
+        Set precision to the lowest precision from all parameters. 
+        Usually all parameters will have the same precision after the fitting procedure.
+        """
+        if self.precision is None:
+            self.precision = parameter.precision
+
+        elif self.precision > parameter.precision:
+                self.precision = parameter.precision
 
     def change_value(self, name, value):
         """
@@ -466,7 +532,7 @@ class FitResult:
 
         add_line("-" * len(self.str))
         add_line(f"Evaluations: {self.nfev}")
-        add_line(f"Chi-Squared: {self.chi_sqr}")
+        add_line(f"Chi-Squared: {round(self.chi_sqr,3)}")
         add_line("")
         add_line("Parameters")
         for parameter in self.result_parameters:
@@ -474,8 +540,8 @@ class FitResult:
 
         add_line("")
         add_line("Covariance Matrix:")
-        add_line(f"Parameters: {self.pcov_names}")
-        with np.printoptions(precision=10, suppress=True, sign="+", linewidth=100):
+        add_line(f"{self.pcov_names}")
+        with np.printoptions(precision=self.precision, suppress=True, sign="+", linewidth=100):
             add_line(str(self.pcov))
 
         return self.str
