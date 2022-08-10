@@ -1,25 +1,31 @@
 import numpy as np
-from scipy import integrate
-from src.limpid.implantation import ImplantationProfile
-from src.limpid.fitting import FitParameter, FitParameters
+from scipy import integrate, constants
 from functools import lru_cache
+
+from .implantation import ImplantationProfile
+from .fitting import FitParameter, FitParameters
 
 
 class Layer:
 
-    def __init__(self, idx: int, profile: ImplantationProfile or None, parameters: FitParameters):
+    def __init__(self, idx: int, precision: int, profile: ImplantationProfile or None, parameters: FitParameters,
+                 thickness: float = np.inf, pos_aff=-1, temp: float = 293):
         self.idx = idx
         self.idx_str = str(idx)
+        self.precision = precision  # floating point precision inn digits, used for numerical integration
         self.parameters = parameters
 
         # add parameters for each layer
-        self.parameters.add(FitParameter(name='lineshape_' + self.idx_str, value=0.50, vary=True, min=1E-15))
-        self.parameters.add(FitParameter(name='diffusioncoeff_' + self.idx_str, value=100, vary=True, min=1E-15))
-        self.parameters.add(FitParameter(name='u_' + self.idx_str, value=0.02, vary=True, min=1E-15))
-        self.parameters.add(FitParameter(name='thickness_' + self.idx_str, value=np.inf, vary=False, min=1E-15))
+        self.parameters.add(FitParameter(name='lineshape_' + self.idx_str, value=np.inf, vary=True, min=1E-15))
+        # the diffusionlength_ is sqrt(D/mu), but often u = 1/diffusionlength is used
+        self.parameters.add(FitParameter(name='diffusionlength_' + self.idx_str, value=70, vary=True, min=1E-15))
+        # diffusioncoeff_ is only relevant if a significant amount of positrons are able to reach a layer boundary
+        self.parameters.add(FitParameter(name='diffusioncoeff_' + self.idx_str, value=1, vary=False, min=1E-15))
+        self.parameters.add(FitParameter(name='thickness_' + self.idx_str, value=thickness, vary=False, min=1E-15))
 
-        self.pos_aff = 1
-
+        self.pos_aff = pos_aff
+        self.temperature = temp
+        self.boltz_stat_factor = np.exp(-self.pos_aff / (constants.physical_constants["Boltzmann constant in eV/K"][0] * self.temperature))
         self.implantation_profile = profile
 
     def set_lineshape(self, value):
@@ -28,8 +34,8 @@ class Layer:
     def set_diffusioncoeff(self, value):
         self.parameters.change_value(name='diffusioncoeff_' + self.idx_str, value=value)
 
-    def set_u(self, value):
-        self.parameters.change_value(name='u_' + self.idx_str, value=value)
+    def set_diffusionlength(self, value):
+        self.parameters.change_value(name='diffusionlength_' + self.idx_str, value=value)
 
     def set_thickness(self, value):
         self.parameters.change_value(name='thickness_' + self.idx_str, value=value)
@@ -42,45 +48,18 @@ class Layer:
         diffusioncoeff = self.parameters['diffusioncoeff_' + self.idx_str].value
         return diffusioncoeff
 
-    def get_u(self):
-        annihilationcoeff = self.parameters['u_' + self.idx_str].value
-        return annihilationcoeff
+    def get_diffusionlength(self):
+        diffusionlength = self.parameters['diffusionlength_' + self.idx_str].value
+        return diffusionlength
 
     def get_thickness(self):
         thickness = self.parameters['thickness_' + self.idx_str].value
         return thickness
 
     def __call__(self, prev_implanted: np.ndarray, energies: np.ndarray) -> (np.ndarray, np.ndarray,
-                                                                             np.ndarray, np.ndarray):
-        u = self.get_u()
-        thickness = self.get_thickness()
+                                                                             np.ndarray, np.ndarray, np.ndarray):
 
-        def integral(f, e):
-            return integrate.quad(f, 0, thickness, args=(e,), epsabs=1e-8, epsrel=1e-8)[0]
-
-        c_left = np.zeros_like(energies)
-        c_right = np.zeros_like(energies)
-        c_ann = np.zeros_like(energies)
-        c_implanted = np.zeros_like(energies)
-
-        for i, energy in enumerate(energies):
-            offset = self.implantation_profile.get_offset(prev_implanted[i], energy)
-            c_left[i] = integral(lambda z, e: self.implantation_profile(z + offset, e) *
-                                              self.concentration_left(z, u, thickness), energy)
-            c_right[i] = integral(lambda z, e: self.implantation_profile(z + offset, e) *
-                                               self.concentration_right(z, u, thickness), energy)
-            c_implanted[i] = integral(lambda z, e: self.implantation_profile(z + offset, e), energy)
-            c_ann[i] = c_implanted[i] - c_left[i] - c_right[i]
-
-        return c_left, c_right, c_ann, c_implanted
-
-    @lru_cache(maxsize=None)
-    def concentration_left(self, z, u, thickness):
-        return (np.exp(-u * z) - np.exp(u * (z - 2 * thickness))) / (1 - np.exp(-2 * u * thickness))
-
-    @lru_cache(maxsize=None)
-    def concentration_right(self, z, u, thickness):
-        return (np.exp(u * z) - np.exp(- u * z)) / (np.exp(u * thickness) - np.exp(- u * thickness))
+        return self.implantation_profile.solve_first_diffusion_step(self.get_diffusionlength(), self.get_thickness(), self.precision, energies, prev_implanted)
 
     def get_rates_for_second_part_of_diffusion(self) -> (float, float):
         """
@@ -88,7 +67,7 @@ class Layer:
         Calculates diffsuion and annihilation probabilities for the diffusion
         process between the left and right layer boundary.
         """
-        u = self.get_u()
+        u = 1 / self.get_diffusionlength()
         thickness = self.get_thickness()
         diffusion_coeff = self.get_diffusioncoeff()
         exponential = u * thickness
@@ -111,7 +90,7 @@ class Layer:
             annihilation = u * diffusion_coeff
 
         else:
-            annihilation = u * diffusion_coeff * (np.exp(u * diffusion_coeff) + np.exp(-u * diffusion_coeff) - 2) / \
+            annihilation = u * diffusion_coeff * (np.exp(u * thickness) + np.exp(-u * thickness) - 2) / \
                            (np.exp(-u * thickness) * np.expm1(2 * u * thickness))
 
-        return diffusion, annihilation
+        return diffusion * self.boltz_stat_factor, annihilation * self.boltz_stat_factor
