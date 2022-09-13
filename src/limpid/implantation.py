@@ -99,6 +99,7 @@ class CMakhovProfile(ImplantationProfile):
 
         num_of_e = len(energies)
 
+        energies = np.asarray(energies)
         c_left = np.zeros_like(energies)
         c_right = np.zeros_like(energies)
         c_ann = np.zeros_like(energies)
