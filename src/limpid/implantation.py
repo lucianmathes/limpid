@@ -7,7 +7,7 @@ import os
 from .c_libraries.compile_c_libs import compile_cmakhov_lib_gcc
 from ctypes import *
 
-PATH_TO_CMAKHOV_LIBRARY = "src/limpid/c_libraries/makhov_library.so"
+PATH_TO_CMAKHOV_LIBRARY = os.path.expanduser("~/.limpid/makhov.so")
 
 class ImplantationProfile(object):
 
@@ -88,7 +88,7 @@ class CMakhovProfile(ImplantationProfile):
         if not os.path.exists(PATH_TO_CMAKHOV_LIBRARY):
             compile_cmakhov_lib_gcc()
 
-        liblimpid = CDLL(f"./{PATH_TO_CMAKHOV_LIBRARY}")
+        liblimpid = CDLL(f"{PATH_TO_CMAKHOV_LIBRARY}")
         ARRAY_POINTER = np.ctypeslib.ndpointer(dtype=np.float64, ndim=1, flags="C")
 
         liblimpid.makhov_integration_func.argtypes = [c_int, ARRAY_POINTER, ARRAY_POINTER, ARRAY_POINTER, ARRAY_POINTER,

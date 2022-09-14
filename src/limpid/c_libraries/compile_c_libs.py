@@ -1,5 +1,9 @@
+import pkg_resources
 import subprocess
 import os
+
+LIB_FOLDER = os.path.expanduser("~/.limpid")
+C_PATH = pkg_resources.resource_stream(__name__, "makhov.c").name
 
 def compile_cmakhov_lib_gcc():
     """
@@ -9,17 +13,19 @@ def compile_cmakhov_lib_gcc():
     """
 
     CWD = os.getcwd()
-    os.chdir(CWD + "/src/limpid/c_libraries")
+    if not os.path.exists(LIB_FOLDER):
+        os.mkdir(LIB_FOLDER)
+    os.chdir(LIB_FOLDER)
 
     print("C library for makhov was not found!")
     print("Compiling makhov_library.c!")
-    cmd_0 = ["gcc", "-Wall", "-fPIC", "-c", "makhov_library.c"]
-    cmd_1 = ["gcc", "-Wall", "-lgsl", "-lgslcblas", "-shared", "-o", "makhov_library.so", "makhov_library.o"]
+    cmd_0 = ["gcc", "-Wall", "-fPIC", "-c", C_PATH]
+    cmd_1 = ["gcc", "-Wall", "-lgsl", "-lgslcblas", "-shared", "-o", "makhov.so", "makhov.o"]
     p = subprocess.Popen(cmd_0)
     p.wait()
     p = subprocess.Popen(cmd_1)
     p.wait()
-    os.remove("makhov_library.o")
+    os.remove("makhov.o")
     print("Compiling completed!")
 
     os.chdir(CWD)
