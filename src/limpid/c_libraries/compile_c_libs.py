@@ -3,7 +3,7 @@ import subprocess
 import os
 
 LIB_FOLDER = os.path.expanduser("~/.limpid")
-C_PATH = pkg_resources.resource_stream(__name__, "makhov.c").name
+C_PATH = pkg_resources.resource_filename(__name__, "makhov.c")
 
 def compile_cmakhov_lib_gcc():
     """
