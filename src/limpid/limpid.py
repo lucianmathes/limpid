@@ -348,11 +348,12 @@ class Sample:
 
         return ls_model
 
-    def show_imp_ann_fracs(self, save=True, show=False, names_layer=None, taglines=None, 
+    def show_imp_ann_fracs(self, save=True, show=False, names_layer=None, 
+                           taglines=None, figtype="pdf",
                            fontsize=11,
                            figsize=(5.8476, 2.5),
                            channel_colors=['lightsteelblue', 'darkseagreen', 'midnightblue', "sienna"],
-                           savename="imp_ann_frac_plot.pdf"):
+                           savename="imp_ann_frac_plot", axis=None):
         """Display Layer distribution of implanted and annihilated positrons.
 
         Parameters
@@ -409,7 +410,7 @@ class Sample:
         ml = MultipleLocator(0.1)
         plt.rcParams['font.size'] = fontsize
         plt.rcParams['figure.figsize'] = figsize
-        if not show:
+        if not show and (figtype == "pgf"):
             matplotlib.use("pgf")
             matplotlib.rcParams.update({
                 "pgf.texsystem": "pdflatex",
@@ -419,7 +420,10 @@ class Sample:
             })
         
         # make plots
-        fig, axs = plt.subplots(2, 1, sharex=True)
+        if not axis is None:
+            axs = axis
+        else:
+            fig, axs = plt.subplots(2, 1, sharex=True)
         # implantation fractions
         f_imp = self.implantation_fractions
         f = np.zeros(np.size(f_imp[0]))
@@ -455,11 +459,16 @@ class Sample:
         axs[1].set_ylim(1.01, 0)
         axs[1].yaxis.set_minor_locator(ml)
         axs[1].grid(which='both', linestyle='--')
-        plt.tight_layout()
-        plt.legend()
-        fig.subplots_adjust(hspace=.0)
-        if save:
+        if axis is None:
+            plt.tight_layout()
+            plt.legend()
+            fig.subplots_adjust(hspace=.0)
+        if save and (axis is None):
+            if figtype == "pgf":
+                matplotlib.use("pgf")
+            savename += "." + figtype
+            print(savename)
             plt.savefig(savename)
-        if show:
+        if show and not (figtype == "pgf"):
             plt.show()
-        plt.close()
+        return axs
