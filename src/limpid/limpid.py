@@ -14,11 +14,11 @@ class Sample:
     def __init__(self, layers, implantation_profile="makhov", sample_name="", epithermal=False, precision: int = 8):
         self.name = sample_name
 
-        """self.surfaces and self.layers: Lists containing all layers, since surfaces often need special treatments 
-        they are separated. The index counting their placement is chosen according the overall structure and not the 
-        placement in the respective list. I.e. the index for the first surface layer is zero, the indices for the 
-        actual layers are then 1, 2, .. and the index for the last surface (if the sample is not infinitely large) is 
-        then N + 1 (assuming N Layers). 
+        """self.surfaces and self.layers: Lists containing all layers, since surfaces often need special treatments
+        they are separated. The index counting their placement is chosen according the overall structure and not the
+        placement in the respective list. I.e. the index for the first surface layer is zero, the indices for the
+        actual layers are then 1, 2, .. and the index for the last surface (if the sample is not infinitely large) is
+        then N + 1 (assuming N Layers).
         """
 
         self.surfaces = []
@@ -70,7 +70,7 @@ class Sample:
 
         # below here are the parameters which are set after the execution
         """
-        -2 if the fitting procedure was not yet called, else it contains the status value 
+        -2 if the fitting procedure was not yet called, else it contains the status value
         from the fitting procedure (compare scipy's least_squares status return)
         """
         self.fit_status = -2
@@ -79,7 +79,7 @@ class Sample:
         self.measurement_lineshape_delta = None
         self.fit_result = None  # FitResult object from the fitting.py script
 
-    def fit(self, lineshape: np.ndarray, lineshape_deltas: np.ndarray, energies: np.ndarray, verbose=0, markov_chain=True, max_nfev=100):
+    def fit(self, lineshape: np.ndarray, lineshape_deltas: np.ndarray, energies: np.ndarray, verbose=0, report_to="./limpid_out.txt", markov_chain=True, max_nfev=100):
 
         # save input data to the sample object for later use (i.e. plots, output, etc.)
         # if the sample object was already used to fit a dataset it will throw an error
@@ -158,6 +158,16 @@ class Sample:
                 diffusionlength_err = self.fit_result["diffusionlength_" + layer.idx_str].stderr
                 print("- Layer "+layer.idx_str+": ", str(round(diffusionlength, self.precision)) + " nm", f"(uncertainty: {round(diffusionlength_err, self.precision)} nm)")
             print(f"\nruntime: {round(stop-start, 5)} s")
+        if report_to:
+            for layer in self.layers:
+                diffusionlength = self.fit_result["diffusionlength_"+layer.idx_str].value
+                diffusionlength_err = self.fit_result["diffusionlength_" + layer.idx_str].stderr
+            with open(report_to, 'w') as f:
+                f.write(str(fitting.result))
+                f.write("\nDiffusionlength(s):")
+                f.write("- Layer "+layer.idx_str+": " + str(round(diffusionlength, self.precision)) + " nm"+ f" (uncertainty: {round(diffusionlength_err, self.precision)} nm)")
+                f.write(f"\nruntime: {round(stop-start, 5)} s")
+
 
     def model_diffusion(self, energies, markov_chain=False):
 
@@ -181,19 +191,21 @@ class Sample:
 
         # Set second surface lineshape
         """
-        The second surface would be necessary for a finite sized last layer. 
+        The second surface would be necessary for a finite sized last layer.
         """
         if len(self.surfaces) == 2:
             lineshapes[-1] = self.surfaces[1].get_lineshape()
         else:
             lineshapes[-1] = 0
 
+        implanted_fractions = []
         for i, layer in enumerate(self.layers):
             c_left, c_right, c_ann, c_implanted, offset = layer(implanted, energies)
             on_boundaries[:, i] += c_left
             on_boundaries[:, i + 1] += c_right
             annihilated[:, i] += c_ann
             offsets[:, i] = offset
+            implanted_fractions.append(c_implanted)
             implanted += c_implanted
 
             # prepare second part of diffusion process
@@ -201,7 +213,7 @@ class Sample:
 
             # get lineshape values
             lineshapes[i + 1] = layer.get_lineshape()
-
+        self.implantation_fractions = implanted_fractions
         # initialize diffusion and annihilation rate arrays
         diffusion_rate_l = np.zeros(len(self.layers) + 1)
         diffusion_rate_r = np.zeros(len(self.layers) + 1)
@@ -211,20 +223,20 @@ class Sample:
         # set diffusion and annihilation rates to non-normalized values
         """
         The following is assumed in the values set below:
-        1) (For now) all positrons located on the first interval boundary annihilate into 
-        the surface region, hence the left and right side diffusion_rate and the 
-        right side annihilation rates are zero. Only the left side annihilation 
+        1) (For now) all positrons located on the first interval boundary annihilate into
+        the surface region, hence the left and right side diffusion_rate and the
+        right side annihilation rates are zero. Only the left side annihilation
         rate is 1.
-        
-        2) For now it is assumed that the last interval is infinitely large, 
-        hence no second surface after the last layer. The left side annihilation 
-        is 1, with all other rates being 0. This enforces that all positrons annihilate within the 
-        defined layers. However, this definition has no effect, since no 
-        positrons will be able to reach the last boundary anyway (it is 
-        infinitely far away). This was done in preparation for a finite sized 
-        layer, which would introduce a second surface at the end. To account for 
-        this consideration, only the left and right side annihilation rates have 
-        to be swapped: i.e. the right side annihilation rate is 1, with all 
+
+        2) For now it is assumed that the last interval is infinitely large,
+        hence no second surface after the last layer. The left side annihilation
+        is 1, with all other rates being 0. This enforces that all positrons annihilate within the
+        defined layers. However, this definition has no effect, since no
+        positrons will be able to reach the last boundary anyway (it is
+        infinitely far away). This was done in preparation for a finite sized
+        layer, which would introduce a second surface at the end. To account for
+        this consideration, only the left and right side annihilation rates have
+        to be swapped: i.e. the right side annihilation rate is 1, with all
         other rates being 0.
         """
         diffusion_rate_l[1:-1] = diffusion_rate[:-1]
@@ -299,7 +311,7 @@ class Sample:
 
             for i in range(len(self.layers) + 1):
                 """
-                Iterating through layers. The lineshape index is shifted by one, 
+                Iterating through layers. The lineshape index is shifted by one,
                 since the first value is used for the surface.
                 """
                 c = on_boundaries[:, i] + on_boundaries[:, i - 1] * r
@@ -335,3 +347,119 @@ class Sample:
             ls_model = ls_model * (1 - epi_frac) + self.parameters["lineshape_epi"].value * epi_frac
 
         return ls_model
+
+    def show_imp_ann_fracs(self, save=True, show=False, names_layer=None, taglines=None, 
+                           fontsize=11,
+                           figsize=(5.8476, 2.5),
+                           channel_colors=['lightsteelblue', 'darkseagreen', 'midnightblue', "sienna"],
+                           savename="imp_ann_frac_plot.pdf"):
+        """Display Layer distribution of implanted and annihilated positrons.
+
+        Parameters
+        ----------
+        show : bool
+            Show plot to user (default is False).
+        save : bool
+            Save figutr to file (default is True).
+        names_layer : list(str)
+            Labels of the Layers.
+        taglines : list(list(int(), float()))
+            List of vertical lines to draw. Each line is described by a list
+            containing an integer desgination the layer and a float (in units 
+            of keV) giving the energy at which it is to be drawn.
+        fontsize : int
+            (default is 11)
+        figsize : tuple(float(), float())
+            Figuresize (default is (5.8476, 2.5)).
+        channel_colors : list(str())
+            (Default is ['lightsteelblue', 'darkseagreen'])
+        savename : str 
+            (default is "imp_ann_frac_plot.pdf"
+        """
+        if type(self.markov_vector) == bool:
+            raise TypeError("Feature not yet implemnted: Currently the implantation and annihilation fraction can only be plotted after running a fit")
+
+        imp_energy = self.measurement_energies
+        #annihilation fractions as a function of energy (result of LIMPID fit)
+        f_channel = []
+        names_channel = []
+        if self.epithermal:
+            epi = 1
+            f_epithermal = self.markov_vector[:,0]
+            f_channel.append(f_epithermal)
+            f_surface = self.markov_vector[:,1]
+            names_channel.append("epithermal")
+        else:
+            epi = 0
+            f_surface = self.markov_vector[:,0]
+        f_channel.append(f_surface)
+        names_channel.append("surface")
+        for i,layer in enumerate(self.layers):
+            f_channel.append(self.markov_vector[:,epi+1+i])
+            makhov_params = layer.implantation_profile.params
+            if names_layer:
+                names_channel.append(names_layer[i])
+            else:
+                names_channel.append(f"layer{i}") 
+        
+        # configure matplotlib
+        import matplotlib
+        import matplotlib.pyplot as plt
+        from matplotlib.ticker import MultipleLocator
+        ml = MultipleLocator(0.1)
+        plt.rcParams['font.size'] = fontsize
+        plt.rcParams['figure.figsize'] = figsize
+        if not show:
+            matplotlib.use("pgf")
+            matplotlib.rcParams.update({
+                "pgf.texsystem": "pdflatex",
+                'font.family': 'serif',
+                'text.usetex': True,
+                'pgf.rcfonts': False,
+            })
+        
+        # make plots
+        fig, axs = plt.subplots(2, 1, sharex=True)
+        # implantation fractions
+        f_imp = self.implantation_fractions
+        f = np.zeros(np.size(f_imp[0]))
+        for f_lay,tag,col in zip(f_imp, names_channel, channel_colors):
+            f += f_lay 
+            axs[0].plot(imp_energy, f, linestyle='-', marker='', color='black')
+            axs[0].fill_between(x=imp_energy, y1 =f-f_lay, y2=f, color=col, label=tag)
+        axs[0].set_ylabel('Implantation \n fractions', fontsize=9)
+        axs[0].set_xlim(min(imp_energy), max(imp_energy))
+        axs[0].set_ylim(0.0, 1.01)
+        axs[0].xaxis.set_ticks_position('top')
+        axs[0].yaxis.set_minor_locator(ml)
+        axs[0].grid(which='both', linestyle='--')
+        # annihilation fractions
+        f = np.zeros(np.size(f_channel[0]))
+        channel_colors.insert(0, "grey")
+        n_l = 0
+        for f_ch, tag, col in zip(f_channel, names_channel, channel_colors):
+            f += f_ch
+            axs[1].plot(imp_energy, f, color='black')
+            axs[1].fill_between(x=imp_energy, y1=f-f_ch, y2=f, color=col, label=tag)
+            if taglines:
+                for l in taglines:
+                    if n_l == l[0]:
+                        e = l[1]
+                        lymin = np.interp(e, imp_energy, f-f_ch)
+                        lymax = np.interp(e, imp_energy, f)
+                        axs[1].vlines(e, ymin=lymin, ymax=lymax, color='steelblue')
+                        axs[1].text(e, 0.62, f'{e:.1f} keV', horizontalalignment='center', fontsize = 8) #, backgroundcolor='lightsteelblue')
+            n_l += 1
+        axs[1].set_xlabel('Implantation energy / keV')
+        axs[1].set_ylabel('Annihilation\nfractions', fontsize=9)
+        axs[1].set_ylim(1.01, 0)
+        axs[1].yaxis.set_minor_locator(ml)
+        axs[1].grid(which='both', linestyle='--')
+        plt.tight_layout()
+        plt.legend()
+        fig.subplots_adjust(hspace=.0)
+        if save:
+            plt.savefig(savename)
+        if show:
+            plt.show()
+        plt.close()

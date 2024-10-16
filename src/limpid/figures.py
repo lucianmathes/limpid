@@ -36,7 +36,7 @@ def fit_result(sample: Sample):
     plt.show()
 
 
-def detailed_fit_result(sample: Sample, profile_energies=("mid", "high")):
+def detailed_fit_result(sample: Sample, pathout="",  profile_energies=("mid", "high"), show=True):
     """
     More detailed plots of the fit result.
     """
@@ -66,6 +66,7 @@ def detailed_fit_result(sample: Sample, profile_energies=("mid", "high")):
     ax1.errorbar(sample.measurement_energies, sample.measurement_lineshape, sample.measurement_lineshape_delta,
                  ls='', capsize=3, label="data")
     ax1.plot(energies, sample.model_diffusion(energies, markov_chain=sample.used_markov_to_fit), label="fit")
+    ax1.set(ylabel="S parameter")
     ax1.legend()
 
     # residuals
@@ -85,6 +86,7 @@ def detailed_fit_result(sample: Sample, profile_energies=("mid", "high")):
     ax3.plot(z_mid, p_mid, label=str(round(e_0, 3)) + " keV")
     ax3.legend()
     ax3.yaxis.set_label_position("right")
+    ax3.set(ylabel="Implantation profile")
     ax3.yaxis.tick_right()
 
     z_high, p_high = calc_implantation_profile(sample, e_1, 100)
@@ -92,7 +94,12 @@ def detailed_fit_result(sample: Sample, profile_energies=("mid", "high")):
     ax4.legend()
     ax4.yaxis.set_label_position("right")
     ax4.yaxis.tick_right()
+    ax4.set(ylabel="Implantation profile")
     ax4.set(xlabel="Depth (nm)")
 
-    fig_main.tight_layout()
-    plt.show()
+    #fig_main.tight_layout()
+    savename = sample.name.split(".")[0]
+    plt.savefig(pathout + f"limpid_out_detailed_{savename}")
+    if show:
+        plt.show()
+    plt.close()

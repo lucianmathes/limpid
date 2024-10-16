@@ -12,7 +12,7 @@ cu = (8.96, 2.84, 1.67, 1.73, -4.81)
 cr = (7.15, 2.74, 1.6735, 1.7595, -2.62)
 
 # select data file
-filepath = "./CuSi688_10.csv"
+filepath = "./CuSi_data.csv"
 
 # read data from file, then load the columns into numpy arrays
 dataset = np.transpose(np.genfromtxt(filepath, delimiter=","))
