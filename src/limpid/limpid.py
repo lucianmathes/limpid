@@ -2,6 +2,9 @@ import time
 import warnings
 import numpy as np
 from scipy import integrate
+import matplotlib
+import matplotlib.pyplot as plt
+from matplotlib.ticker import MultipleLocator
 
 from .layer import Layer
 from .surface import Surface
@@ -159,13 +162,13 @@ class Sample:
                 print("- Layer "+layer.idx_str+": ", str(round(diffusionlength, self.precision)) + " nm", f"(uncertainty: {round(diffusionlength_err, self.precision)} nm)")
             print(f"\nruntime: {round(stop-start, 5)} s")
         if report_to:
-            for layer in self.layers:
-                diffusionlength = self.fit_result["diffusionlength_"+layer.idx_str].value
-                diffusionlength_err = self.fit_result["diffusionlength_" + layer.idx_str].stderr
             with open(report_to, 'w') as f:
                 f.write(str(fitting.result))
                 f.write("\nDiffusionlength(s):")
-                f.write("- Layer "+layer.idx_str+": " + str(round(diffusionlength, self.precision)) + " nm"+ f" (uncertainty: {round(diffusionlength_err, self.precision)} nm)")
+                for layer in self.layers:
+                    diffusionlength = self.fit_result["diffusionlength_"+layer.idx_str].value
+                    diffusionlength_err = self.fit_result["diffusionlength_" + layer.idx_str].stderr
+                    f.write("- Layer "+layer.idx_str+": " + str(round(diffusionlength, self.precision)) + " nm"+ f" (uncertainty: {round(diffusionlength_err, self.precision)} nm)")
                 f.write(f"\nruntime: {round(stop-start, 5)} s")
 
 
@@ -372,13 +375,17 @@ class Sample:
             (default is 11)
         figsize : tuple(float(), float())
             Figuresize (default is (5.8476, 2.5)).
-        channel_colors : list(str())
+        channel_colors : list(str()), optional
             (Default is ['lightsteelblue', 'darkseagreen'])
-        savename : str 
+        savename : str, optional
             (default is "imp_ann_frac_plot.pdf"
         """
+
         if type(self.markov_vector) == bool:
-            raise TypeError("Feature not yet implemnted: Currently the implantation and annihilation fraction can only be plotted after running a fit")
+            err = ("Cannot create plot of implanted and annihilated fractions "
+                   "without modelling diffusion. Call Sample.fit() or "
+                   "Sample.model_diffusion() first.")
+            raise TypeError(err)
 
         imp_energy = self.measurement_energies
         #annihilation fractions as a function of energy (result of LIMPID fit)
@@ -404,13 +411,10 @@ class Sample:
                 names_channel.append(f"layer{i}") 
         
         # configure matplotlib
-        import matplotlib
-        import matplotlib.pyplot as plt
-        from matplotlib.ticker import MultipleLocator
         ml = MultipleLocator(0.1)
         plt.rcParams['font.size'] = fontsize
         plt.rcParams['figure.figsize'] = figsize
-        if not show and (figtype == "pgf"):
+        if not show:
             matplotlib.use("pgf")
             matplotlib.rcParams.update({
                 "pgf.texsystem": "pdflatex",

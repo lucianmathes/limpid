@@ -36,7 +36,7 @@ def fit_result(sample: Sample):
     plt.show()
 
 
-def detailed_fit_result(sample: Sample, pathout="",  profile_energies=("mid", "high"), show=True):
+def detailed_fit_result(sample: Sample, output_dir="", profile_energies=("mid", "high"), show=True):
     """
     More detailed plots of the fit result.
     """
@@ -86,7 +86,7 @@ def detailed_fit_result(sample: Sample, pathout="",  profile_energies=("mid", "h
     ax3.plot(z_mid, p_mid, label=str(round(e_0, 3)) + " keV")
     ax3.legend()
     ax3.yaxis.set_label_position("right")
-    ax3.set(ylabel="Implantation profile")
+    ax3.set(ylabel="Implanted fraction")
     ax3.yaxis.tick_right()
 
     z_high, p_high = calc_implantation_profile(sample, e_1, 100)
@@ -94,12 +94,12 @@ def detailed_fit_result(sample: Sample, pathout="",  profile_energies=("mid", "h
     ax4.legend()
     ax4.yaxis.set_label_position("right")
     ax4.yaxis.tick_right()
-    ax4.set(ylabel="Implantation profile")
+    ax4.set(ylabel="Implanted fraction")
     ax4.set(xlabel="Depth (nm)")
 
     #fig_main.tight_layout()
     savename = sample.name.split(".")[0]
-    plt.savefig(pathout + f"limpid_out_detailed_{savename}")
+    plt.savefig(output_dir + f"limpid_out_detailed_{savename}")
     if show:
         plt.show()
     plt.close()

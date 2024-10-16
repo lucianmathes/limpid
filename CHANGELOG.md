@@ -7,9 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.2.0] - 2022-11-11
 ### Added
-- Method to Sample which outputs figures of implantation and annihilation per layer vs. energy.
-- Method of Sample: detailed_fit_result now saves the figure to file.
-- Fit result to txt output.
+- Method Sample.show_imp_ann_fracs() which outputs figures of implantation and annihilation fraction per layer vs. energy.
+- Sample.detailed_fit_result() now saves the figure to a file.
+- Output Sample.fit() result to text file.
 
 ## [0.1.1] - 2022-10-10
 ### Added
