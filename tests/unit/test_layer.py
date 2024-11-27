@@ -1,6 +1,6 @@
 import unittest
 
-from limpid import Sample
+from limpid import Layer, Sample
 
 
 class TestLayer(unittest.TestCase):
@@ -12,7 +12,7 @@ class TestLayer(unittest.TestCase):
         density = 4.5
         a, n, m = (1, 2, 3)
 
-        l = (lower_boundary, density, a, n, m)
+        l = Layer(density, (a, n, m))
         s = Sample([l])
         l_sample = s.layers[0]
 

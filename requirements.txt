@@ -1,4 +1,5 @@
 setuptools
+lmfit
 numpy
 numba
 scipy
