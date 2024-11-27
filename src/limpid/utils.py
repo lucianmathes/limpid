@@ -25,13 +25,13 @@ def calc_implantation_profile(sample: Sample, energy: float, N: int):
 
         max_layer_depth = layer.implantation_profile.get_depth(0.999, energy)
 
-        if max_layer_depth < layer.get_thickness() + offset:
+        if max_layer_depth < layer.thickness + offset:
             max_depth = max_layer_depth - offset
             implanted.append(0.999 - implanted[-1])
 
         else:
             implanted.append(integrate.quad(lambda z: layer.implantation_profile(z + offset, energy), 0,
-                                            layer.get_thickness(), epsabs=1e-5, epsrel=1e-5)[0] - implanted[-1])
+                                            layer.thickness, epsabs=1e-5, epsrel=1e-5)[0] - implanted[-1])
 
     def combined_implantation_profile(z):
 
@@ -39,7 +39,7 @@ def calc_implantation_profile(sample: Sample, energy: float, N: int):
         total_depth = 0
 
         for offset, layer in zip(offsets, layers):
-            total_depth += layer.get_thickness()
+            total_depth += layer.thickness
             if lower_bound <= z <= total_depth:
                 return layer.implantation_profile(z + offset, energy)
             else:

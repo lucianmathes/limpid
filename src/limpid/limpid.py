@@ -1,229 +1,495 @@
 import time
-import warnings
+import lmfit
 import numpy as np
-from scipy import integrate
-import matplotlib
-import matplotlib.pyplot as plt
-from matplotlib.ticker import MultipleLocator
 
-from .layer import Layer
-from .surface import Surface
+from scipy import integrate
+from functools import cache
+
 from .implantation import MakhovProfile, CMakhovProfile
-from .fitting import FitParameters, FitParameter, Fit
+
+
+BOLTZMANN_CONSTANT = 8.617333262e-05 # in eV/K
+LAYERS_CREATED = 0
+
+
+class Layer:
+
+    def __init__(self,
+                 density: float,
+                 makhov_parameters: tuple[float, float, float],
+                 thickness: float = np.inf,
+                 lineshape: float = np.inf,
+                 diffusion_length: float = 70,
+                 diffusion_coefficient: float = 1,
+                 positron_affinity: float = -1,
+                 temperature: float = 293,
+                 precision: int = 8,
+                 index: int|None = None):
+
+        global LAYERS_CREATED
+        LAYERS_CREATED += 1
+
+        if index is None:
+            self.index = LAYERS_CREATED
+        else:
+            self.index = index
+
+        self.density = density
+        self.makhov_parameters = makhov_parameters
+        self.precision = precision  # floating point precision in digits
+        self.implantation_profile = None
+
+        self.parameters = lmfit.Parameters()
+        self.parameters.add(f'thickness_{self.index}', value=thickness,
+                            vary=False, min=1E-15)
+        self.parameters.add(f'lineshape_{self.index}', value=lineshape,
+                            vary=True, min=1E-15)
+        self.parameters.add(f'diffusion_length_{self.index}',
+                            value=diffusion_length, vary=True, min=1E-15)
+        self.parameters.add(f'diffusion_coefficient_{self.index}',
+                            value=diffusion_coefficient, vary=False, min=1E-15)
+
+        self.positron_affinity = positron_affinity
+        self.temperature = temperature
+        self.boltzmann_factor = np.exp(-self.positron_affinity
+                                / (BOLTZMANN_CONSTANT * self.temperature))
+
+    @property
+    def thickness(self):
+        return self.parameters[f'thickness_{self.index}'].value
+
+    @thickness.setter
+    def thickness(self, value):
+        self.parameters[f'thickness_{self.index}'].value = value
+
+    @property
+    def lineshape(self):
+        return self.parameters[f'lineshape_{self.index}'].value
+
+    @lineshape.setter
+    def lineshape(self, value):
+        self.parameters[f'lineshape_{self.index}'].value = value
+
+    @property
+    def diffusion_length(self):
+        return self.parameters[f'diffusion_length_{self.index}'].value
+
+    @diffusion_length.setter
+    def diffusion_length(self, value):
+        self.parameters[f'diffusion_length_{self.index}'].value = value
+
+    @property
+    def diffusion_coefficient(self):
+        return self.parameters[f'diffusion_coefficient_{self.index}'].value
+
+    @diffusion_coefficient.setter
+    def diffusioncoeff(self, value):
+        self.parameters[f'diffusion_coefficient_{self.index}'].value = value
+
+    def solve_first_diffusion_step(self, energies, previously_implanted):
+        prec_exp = 10 ** (-self.precision)
+
+        @cache
+        def concentration_left(z, thickness, u):
+            numerator = np.exp(-u * z) - np.exp(u * (z - 2 * thickness))
+            denominator = 1 - np.exp(-2 * u * thickness)
+            return numerator / denominator
+
+        @cache
+        def concentration_right(z, thickness, u):
+            numerator = np.exp(u * z) - np.exp(- u * z)
+            denominator = (np.exp(u * thickness) - np.exp(- u * thickness))
+            return numerator / denominator
+
+        def integral(f, e):
+            return integrate.quad(f, 0, self.thickness, args=(e,),
+                                  epsabs=prec_exp, epsrel=prec_exp)[0]
+
+        # Offset of the implantation profile. Depth until which the
+        # integral is equal to previously_implanted, if the entire sample
+        # was made out of this layer's material.
+        c_left = np.zeros_like(energies)
+        c_right = np.zeros_like(energies)
+        c_annihilated = np.zeros_like(energies)
+        c_implanted = np.zeros_like(energies)
+        offsets = np.zeros_like(energies)
+
+        for i, energy in enumerate(energies):
+            offset = self.implantation_profile.get_depth(
+                             previously_implanted[i], energy)
+            offsets[i] = offset
+            c_left[i] = integral(lambda z, e: self.implantation_profile(z + offset, e) *
+                    concentration_left(z, self.thickness, 1/self.diffusion_length), energy)
+            c_right[i] = integral(lambda z, e: self.implantation_profile(z + offset, e) *
+                    concentration_left(z, self.thickness, 1/self.diffusion_length), energy)
+            c_implanted[i] = integral(lambda z, e: self.implantation_profile(z + offset, e), energy)
+            c_annihilated[i] = c_implanted[i] - c_left[i] - c_right[i]
+
+        return c_left, c_right, c_annihilated, c_implanted, offsets
+
+    def get_rates_for_second_part_of_diffusion(
+        self
+        ) -> tuple[float, float]:
+        """Perform second computational step of the diffusion simulation.
+
+        Calculates diffusion and annihilation probabilities for the diffusion
+        process between the left and right layer boundary.
+        """
+
+        u = 1 / self.diffusion_length
+        thickness = self.thickness
+        diffusion_coeff = self.diffusion_coefficient
+        exponential = u * thickness
+
+        # diffusion
+        if exponential >= 700:
+            # exp(709) ~ 10^308 -> overflow
+            diffusion = 0
+
+        elif exponential >= 30:
+            # exp(-30) ~ 10^-15 -> truncated, since negligible
+            diffusion = 2 * u * diffusion_coeff * np.exp(-u * thickness)
+
+        else:
+            diffusion = 2 * u * diffusion_coeff * 1 / (np.exp(-u * thickness) * np.expm1(2 * u * thickness))
+
+        # annihilation
+        if exponential >= 30:
+            # exp(-30) ~ 10^-15 -> truncated, since negligible
+            annihilation = u * diffusion_coeff
+
+        else:
+            annihilation = u * diffusion_coeff * (np.exp(u * thickness) + np.exp(-u * thickness) - 2) / \
+                           (np.exp(-u * thickness) * np.expm1(2 * u * thickness))
+
+        return diffusion * self.boltzmann_factor, annihilation * self.boltzmann_factor
+
+
+class Surface:
+
+    def __init__(self,
+                 positron_affinity: float = -12,
+                 temperature: float = 293,
+                 parameters: lmfit.Parameters|None = None,
+                 precision: int = 8,
+                 index: int = 0):
+
+        self.positron_affinity = positron_affinity
+        self.temperature = temperature
+        self.parameters = parameters
+        self.precision = precision
+        self.index = index
+        self.boltzmann_factor = np.exp(-self.positron_affinity
+                                / (BOLTZMANN_CONSTANT * self.temperature))
+
+    @property
+    def lineshape(self):
+        return self.parameters[f'lineshape_{self.index}'].value
+
+    @lineshape.setter
+    def lineshape(self, value):
+        self.parameters[f'lineshape_{self.index}'].value = value
 
 
 class Sample:
+    """A digital representation of your sample.
 
-    def __init__(self, layers, implantation_profile="makhov", sample_name="", epithermal=False, precision: int = 8):
-        self.name = sample_name
+    The Sample class makes the LIMPID core functionalities to model
+    positron implantation, diffusion and annihilation in your sample
+    accessible. It is constructed by one or multiple Layer objects and
+    contains all information necessary for the simulations.
 
-        """self.surfaces and self.layers: Lists containing all layers, since surfaces often need special treatments
-        they are separated. The index counting their placement is chosen according the overall structure and not the
-        placement in the respective list. I.e. the index for the first surface layer is zero, the indices for the
-        actual layers are then 1, 2, .. and the index for the last surface (if the sample is not infinitely large) is
-        then N + 1 (assuming N Layers).
+    Attributes:
+        layers: A list of Layer objects representing the sample.
+        surfaces: A list of Surface objects terminating the sample.
+        name: A string containing the name of the sample.
+        implantation_model: A string containing the model used for
+          positron implantation.
+        epithermal_correction: A boolean indicating if a correction for
+          epithermal positrons is applied.
+        temperature: A float containing the sample temperature in K.
+        precision: An integer count of decimals used for computation.
+        parameters: An lmfit.Parameters object containing all (fixed and
+          varied) fit parameters.
+    """
+
+    def __init__(self,
+                 layers: tuple[Layer, ...],
+                 name: str = "",
+                 implantation_model: str = "makhov",
+                 epithermal_correction: bool = False,
+                 temperature: float = 293,
+                 precision: int = 8,
+                 markov_chain: bool = True):
+        """Initializes the sample based on layers.
+
+        Args:
+            layers: A list of Layer objects representing the sample.
+            name: Defines the name of the sample.
+            implantation_model: Defines the model used for positron
+              implantation.
+            epithermal_correction: If True a correction for epithermal
+              positrons is applied.
+            temperature: Defines the sample temperature in K.
+            precision: Defines the decimals used for computation, i.e., error
+              tolerance of the implantation profile integral and fit tolerance.
+              Default is 8, resulting in a tolerance of 10^(-8).
+            markov_chain: If True a markov chain approach is used to simulate
+              positron diffusion.
         """
 
-        self.surfaces = []
-        self.layers = []
+        self.layers = layers
+        self.name = name
+        self.implantation_model = implantation_model
+        self.epithermal_correction = epithermal_correction
+        self.temperature = temperature
         self.precision = precision
-        self.epithermal = epithermal
-        self.temperature = 293
+        self.markov_chain = markov_chain
+
+        self.parameters = lmfit.Parameters()
+        # -2 if the fitting procedure was not yet called, else it contains the status value
+        # from the fitting procedure (compare scipy's least_squares status return)
+        self.fit_status = -2
+        self.measurement_energies = None
+        self.measurement_lineshape = None
+        self.measurement_lineshape_delta = None
+        #self.fit_result = None  # FitResult object from the fitting.py script
+
 
         # markov process
         self.markov_vector = False
         self.used_markov_to_fit = False
 
         if self.precision > 15:
+            wrn = ('A precision of more than 15 digits is unachievable. The '
+                   'precision has been set to 15.')
+            print(wrn)
             self.precision = 15
-            warnings.warn("A precision of more than 15 digits is unachievable. The precision has been set to 15.")
 
-        self.parameters = FitParameters()
+        # add list containing the first surface
+        self.surfaces = [Surface(positron_affinity=-12,
+                                 temperature=self.temperature,
+                                 parameters=self.parameters,
+                                 precision=self.precision,
+                                 index=0)]
+        # add fit parameters for the first surface
+        self.parameters.add('lineshape_0', value=np.inf, vary=True, min=1E-15)
 
-        if self.epithermal:
-            self.parameters.add(FitParameter(name='lineshape_epi', value=np.inf, vary=True, min=1E-15))
-            # Due to the nature of the epithermal correction, the lower bound is set 1E-5. This makes sure,
-            # that the algorithm does not randomly deactivate the epithermal correction by setting it to 1E-15 (
-            # effectively 0).
-            self.parameters.add(FitParameter(name='l_epi', value=1, vary=True, min=1E-15))
+        # for every layer: set the correct index and define the implantation
+        # profile
+        for i, layer in enumerate(layers):
+            i += 1 # shift index by one to account for surface layer
+            layer.index = i
+            for name, p in layer.parameters.items():
+                # copy all parameters from the Layer object and assign the
+                # correct index to them
+                self.parameters.add(f'{name.rsplit("_", maxsplit=1)[0]}_{i}',
+                                    value=p.value, vary=p.vary,
+                                    min=p.min, max=p.max)
 
+            # make layer.parameters a pointer to Sample.parameters
+            layer.parameters = self.parameters
 
-        # add first surface
-        self.surfaces.append(Surface(0, self.precision, self.parameters, temp=self.temperature, pos_aff=-12))
-
-        # add layers, index shifted by one to account for surface layer
-        for idx, params in enumerate(layers):
-            if implantation_profile == "makhov":
-                profile = MakhovProfile(params[:-1])
-            elif implantation_profile == "cmakhov":
-                profile = CMakhovProfile(params[:-1])
+            if implantation_model == 'makhov':
+                layer.implantation_profile = MakhovProfile(
+                                    [layer.density, *layer.makhov_parameters])
+            elif implantation_model == 'cmakhov':
+                layer.implantation_profile = CMakhovProfile(
+                                    [layer.density, *layer.makhov_parameters])
             else:
-                raise TypeError("Only 'makhov' and 'cmakhov' are currently implemented.")
+                err = ( 'Unknown model for positron implantation '
+                       f'"{implantation_model}". Please choose from "makhov" '
+                        'and "cmakhov".')
+                raise NotImplementedError(err)
 
-            # indices shifted by one to account for the first surface interval
-            if idx < len(layers) - 1:
-                self.layers.append(Layer(idx + 1, self.precision, profile, self.parameters, 230, pos_aff=params[-1], temp=self.temperature))
-            else:
+            if i == len(layers):
                 # last layer defaults to infinite thickness
-                self.layers.append(Layer(idx + 1, self.precision, profile, self.parameters, np.inf, pos_aff=params[-1], temp=self.temperature))
+                if layer.thickness != np.inf:
+                    wrn = (f'Invalid thickness ({layer.thickness}) for the '
+                           f'last layer (#{layer.index}). Thickness set to '
+                            'inf.')
+                    print(wrn)
+                layer.thickness = np.inf
+            else:
+                if layer.thickness == np.inf:
+                    layer.thickness = 200 # set a default starting value
 
-        # add last surface (currently only implemented as a placeholder, since samples are assumed to be
-        # infinitely large).
-        # self.surfaces.append(Surface(len(self.layers) + 1, self.parameters))
+        if self.epithermal_correction:
+            # Due to the nature of the epithermal correction, we set the lower
+            # bound for the "diffusion length" to 1E-5. This makes sure, that
+            # the algorithm does not randomly deactivate the epithermal
+            # correction by setting it to 1E-15 (effectively 0).
+            self.parameters.add('lineshape_epithermal', value=np.inf,
+                                vary=True, min=1E-15)
+            self.parameters.add('diffusion_length_epithermal', value=1,
+                                vary=True, min=1E-5)
 
-        # below here are the parameters which are set after the execution
+    def fit(self,
+            lineshape: np.ndarray,
+            lineshape_deltas: np.ndarray,
+            energies: np.ndarray,
+            verbose=0,
+            report_to="./limpid_out.txt",
+            markov_chain: bool|None = None,
+            max_nfev=100):
+        """Performs a fit to the data provided.
+
+        Args:
         """
-        -2 if the fitting procedure was not yet called, else it contains the status value
-        from the fitting procedure (compare scipy's least_squares status return)
-        """
-        self.fit_status = -2
-        self.measurement_energies = None
-        self.measurement_lineshape = None
-        self.measurement_lineshape_delta = None
-        self.fit_result = None  # FitResult object from the fitting.py script
 
-    def fit(self, lineshape: np.ndarray, lineshape_deltas: np.ndarray, energies: np.ndarray, verbose=0, report_to="./limpid_out.txt", markov_chain=True, max_nfev=100):
+        if markov_chain is not None:
+            self.markov_chain = markov_chain
 
-        # save input data to the sample object for later use (i.e. plots, output, etc.)
-        # if the sample object was already used to fit a dataset it will throw an error
-        # this is done to reduce the potential problems caused by negligence
+        # Save input data to the sample object for later use (i.e., plots,
+        # output, etc.). If the sample object was already used to fit a 
+        # dataset, raise an error to avoid problems caused by negligence.
         if self.fit_status > -2:
-            raise UserWarning("This Sample object was already used to fit a dataset. Please create a new Sample object.")
+            err = ('Sample object was already used to fit a dataset. Please '
+                   'create a new Sample object.')
+            raise RuntimeError(err)
         else:
             self.measurement_energies = energies.copy()
             self.measurement_lineshape = lineshape.copy()
             self.measurement_lineshape_delta = lineshape_deltas.copy()
-            # self.fit_status = 2 for testing plot, also comment everything below as well
 
-        # the lineshape guess is only used, if the initialisation value is still set to infinite, this avoids
-        # overwriting values set by the user.
-        # initialize epithermal guess
-        if self.epithermal and self.parameters['lineshape_epi'].value == np.inf:
-            self.parameters.change_value(name='lineshape_epi', value=lineshape[0])
+        # TODO: Sort data by implantation energy
 
-        # bulk lineshape guess
-        number_of_layers = len(self.layers)
-        number_of_energies = len(lineshape)
+        # Define a useful initial guess. Lineshape guesses are only used, if
+        # the value is set to inf. This avoids overwriting user defined values.
+        if (self.epithermal_correction
+            and self.parameters['lineshape_epithermal'].value == np.inf):
+            self.parameters['lineshape_epithermal'].value = lineshape[0]
 
-        # used to shift the guess for the bulk, is set to one if a second surface exists. This shifts (if shift is 1)
-        # the guess from the last lineshape value to lineshape[-1-stepsize], ensuring a different guess than the
-        # second surface
-        shift = 0
-        if len(self.surfaces) == 2:
-            shift = 1
-
-        stepsize = number_of_energies//(number_of_layers + shift)
-
-        index = -1 - (shift * stepsize)
+        index = -1
+        stepsize = len(lineshape) // len(self.layers)
         for layer in self.layers[::-1]:
-            if layer.get_lineshape() == np.inf:
-                layer.set_lineshape(lineshape[index])
+            if layer.lineshape == np.inf:
+                layer.lineshape = lineshape[index]
             index -= stepsize
 
-
-        # initialize guess
-        # Surface lineshape guess for first surface. If epithermal correction is activated,
-        # it is set between the epithermal and first layer lineshape value
-        if self.surfaces[0].get_lineshape() == np.inf:
-            if self.epithermal:
-                self.surfaces[0].set_lineshape((self.parameters['lineshape_epi'].value + self.parameters['lineshape_1'].value)/2)
+        # Surface lineshape guess for the surface. If epithermal_correction
+        # is True, use a value between epithermal and first layer lineshape.
+        if self.surfaces[0].lineshape == np.inf:
+            if self.epithermal_correction:
+                self.surfaces[0].lineshape = (self.parameters['lineshape_epithermal'].value
+                                              + self.parameters['lineshape_1'].value) / 2
             else:
-                self.surfaces[0].set_lineshape(lineshape[0])
+                self.surfaces[0].lineshape = lineshape[0]
 
-        # surface lineshape guess for last surface (if it exists)
-        if len(self.surfaces) == 2 and self.surfaces[1].get_lineshape() == np.inf:
-            self.surfaces[1].set_lineshape(lineshape[-1])
+        def residuals(parameters, energies):
+            """Residual function used for fitting."""
+            # update parameters used by the model_diffusion() method
+            for p in parameters:
+                self.parameters[p].value = parameters[p].value
 
-        # create residual function
-        def residual(params):
-            # params are automatically dealt with by the model_diffusion() method
-            _ = params
+            diff = (self.model_diffusion(energies) - lineshape)
+            return diff / lineshape_deltas
 
-            # returns residuals
-            residuals = (self.model_diffusion(energies, markov_chain=markov_chain) - lineshape) / lineshape_deltas
-            return residuals
+        # Perform the actual fit
+        start_time = time.time()
+        mini = lmfit.Minimizer(residuals, self.parameters,
+                               fcn_args=(energies,))
 
-        # fit
-        start = time.time()
-        fitting = Fit(residual, self.parameters)
+        precision_exp = 10 ** (-self.precision)
+        fit_result = mini.least_squares(max_nfev=max_nfev, jac='2-point',
+                                        ftol=precision_exp, xtol=precision_exp,
+                                        gtol=precision_exp)
 
-        fitting.least_squares(method="dogbox", verbose=verbose, precision=self.precision, max_nfev=max_nfev)
-        self.fit_result = fitting.result
-        stop = time.time()
+        fit_duration = np.round(time.time() - start_time, 5)
+        self.fit_status = fit_result.status
 
-        self.fit_status = fitting.result.status
-
+        msg = (f'\nFit duration: {fit_duration} s'
+                '\nDiffusion length(s):')
+        for layer in self.layers:
+            diffusion_length_err = fit_result.params[f'diffusion_length_{layer.index}'].stderr
+            msg += (f'\n- Layer {layer.index}: '
+                    f'({np.round(layer.diffusion_length, self.precision)} '
+                    f'+/- {np.round(diffusion_length_err, self.precision)})'
+                     ' nm')
         if verbose >= 1:
-            print(fitting.result)
-            print("\nDiffusionlength(s):")
-            for layer in self.layers:
-                diffusionlength = self.fit_result["diffusionlength_"+layer.idx_str].value
-                diffusionlength_err = self.fit_result["diffusionlength_" + layer.idx_str].stderr
-                print("- Layer "+layer.idx_str+": ", str(round(diffusionlength, self.precision)) + " nm", f"(uncertainty: {round(diffusionlength_err, self.precision)} nm)")
-            print(f"\nruntime: {round(stop-start, 5)} s")
+            print(msg)
         if report_to:
             with open(report_to, 'w') as f:
-                f.write(str(fitting.result))
-                f.write("\nDiffusionlength(s):")
-                for layer in self.layers:
-                    diffusionlength = self.fit_result["diffusionlength_"+layer.idx_str].value
-                    diffusionlength_err = self.fit_result["diffusionlength_" + layer.idx_str].stderr
-                    f.write("- Layer "+layer.idx_str+": " + str(round(diffusionlength, self.precision)) + " nm"+ f" (uncertainty: {round(diffusionlength_err, self.precision)} nm)")
-                f.write(f"\nruntime: {round(stop-start, 5)} s")
+                f.write(msg)
+
+        return fit_result
 
 
-    def model_diffusion(self, energies, markov_chain=False):
+    def model_diffusion(self,
+                        implantation_energies: tuple[float, ...],
+                        markov_chain: bool|None = None
+                        ):
+        """Simulate positron diffusion and return the resulting depth profile.
 
-        implanted = np.zeros_like(energies)
-        annihilated = np.zeros((len(energies), len(self.layers) + 1))
-        offsets = np.zeros((len(energies), len(self.layers)))
-        on_boundaries = np.zeros((len(energies), len(self.layers) + 1))
+        Args:
+            implantation_energies: Simulate positron diffusion for the
+              implantation energies provided.
 
-        diffusion_rate = np.zeros(len(self.layers))
-        annihilation_rate = np.zeros(len(self.layers))
-
-        lineshapes = np.zeros(len(self.layers) + 2)
-
-        """
-        Currently only the lineshapes are fitted for the surface layer, all other parameters are assumed to have certain
-        properties, which is further elaborated down below.
+        Returns:
+            A list of lineshape parameter values resulting from positron
+            annihilation after implantation and diffusion. One lineshape value
+            per implantation energy specified.
         """
 
-        # Set surface lineshape
-        lineshapes[0] = self.surfaces[0].get_lineshape()
+        if markov_chain is not None:
+            self.markov_chain = markov_chain
 
-        # Set second surface lineshape
-        """
-        The second surface would be necessary for a finite sized last layer.
-        """
-        if len(self.surfaces) == 2:
-            lineshapes[-1] = self.surfaces[1].get_lineshape()
-        else:
-            lineshapes[-1] = 0
+        # make sure that energies are floats (and not integers)
+        implantation_energies = np.array(implantation_energies, dtype=float)
+
+        # Save implantation energies for later use (mainly plotting).
+        # Will be overwritten with data when calling fit().
+        if self.measurement_energies is None:
+            self.measurement_energies = implantation_energies
+
+        n_energies = len(implantation_energies)
+        n_layers = len(self.layers)
+
+        implanted = np.zeros(n_energies)
+        annihilated = np.zeros((n_energies, n_layers + 1))
+        offsets = np.zeros((n_energies, n_layers))
+        on_boundaries = np.zeros((n_energies, n_layers + 1))
+
+        diffusion_rate = np.zeros(n_layers)
+        annihilation_rate = np.zeros(n_layers)
+
+        lineshapes = np.zeros(n_layers + 2)
+
+        # Get surface lineshape value
+        if np.isinf(self.surfaces[0].lineshape):
+            err = ('Surface lineshape value is set to infinite. Please set a '
+                   'sensible value.')
+            raise RuntimeError(err)
+        lineshapes[0] = self.surfaces[0].lineshape
+        lineshapes[-1] = 0
 
         implanted_fractions = []
         for i, layer in enumerate(self.layers):
-            c_left, c_right, c_ann, c_implanted, offset = layer(implanted, energies)
+            # get lineshape values
+            lineshapes[i + 1] = layer.lineshape
+
+            c_left, c_right, c_annihilated, c_implanted, offset = \
+                layer.solve_first_diffusion_step(implantation_energies,
+                                                 implanted)
             on_boundaries[:, i] += c_left
             on_boundaries[:, i + 1] += c_right
-            annihilated[:, i] += c_ann
+            annihilated[:, i] += c_annihilated
             offsets[:, i] = offset
             implanted_fractions.append(c_implanted)
             implanted += c_implanted
 
             # prepare second part of diffusion process
-            diffusion_rate[i], annihilation_rate[i] = layer.get_rates_for_second_part_of_diffusion()
+            diffusion_rate[i], annihilation_rate[i] = \
+                            layer.get_rates_for_second_part_of_diffusion()
 
-            # get lineshape values
-            lineshapes[i + 1] = layer.get_lineshape()
         self.implantation_fractions = implanted_fractions
-        # initialize diffusion and annihilation rate arrays
-        diffusion_rate_l = np.zeros(len(self.layers) + 1)
-        diffusion_rate_r = np.zeros(len(self.layers) + 1)
-        annihilation_rate_l = np.ones(len(self.layers) + 1)
-        annihilation_rate_r = np.zeros(len(self.layers) + 1)
 
-        # set diffusion and annihilation rates to non-normalized values
+        # initialize diffusion and annihilation rate arrays
+        diffusion_rate_l = np.zeros(n_layers + 1)
+        diffusion_rate_r = np.zeros(n_layers + 1)
+        annihilation_rate_l = np.ones(n_layers + 1)
+        annihilation_rate_r = np.zeros(n_layers + 1)
+
         """
         The following is assumed in the values set below:
         1) (For now) all positrons located on the first interval boundary annihilate into
@@ -242,20 +508,23 @@ class Sample:
         to be swapped: i.e. the right side annihilation rate is 1, with all
         other rates being 0.
         """
+
+        # set diffusion and annihilation rates (to non-normalized values)
         diffusion_rate_l[1:-1] = diffusion_rate[:-1]
         diffusion_rate_r[1:-1] = diffusion_rate[1:]
         annihilation_rate_l[1:-1] = annihilation_rate[:-1]
         annihilation_rate_r[1:-1] = annihilation_rate[1:]
 
         # normalize diffusion and annihilation rates
-        norm = diffusion_rate_r + diffusion_rate_l + annihilation_rate_r + annihilation_rate_l
-        diffusion_rate_l = diffusion_rate_l / norm
-        diffusion_rate_r = diffusion_rate_r / norm
-        annihilation_rate_l = annihilation_rate_l / norm
-        annihilation_rate_r = annihilation_rate_r / norm
+        sum_of_rates = (diffusion_rate_r + diffusion_rate_l + annihilation_rate_r
+                        + annihilation_rate_l)
+        diffusion_rate_l = diffusion_rate_l / sum_of_rates
+        diffusion_rate_r = diffusion_rate_r / sum_of_rates
+        annihilation_rate_l = annihilation_rate_l / sum_of_rates
+        annihilation_rate_r = annihilation_rate_r / sum_of_rates
 
         # markov chain approach
-        if markov_chain:
+        if self.markov_chain:
             self.used_markov_to_fit = True
             # building markov process matrix M
             number_of_final_states = 1 + len(self.layers) + 1  # these are surface, layers, surface
@@ -263,7 +532,7 @@ class Sample:
             dimension = number_of_final_states + number_of_inter_states
 
             # create initial population matrix after first diffusion step
-            population_matrix = np.zeros((len(energies), dimension))
+            population_matrix = np.zeros((n_energies, dimension))
             # column 0 (annihilated in first surface) is 0
 
             # columns for layer are set by the already annihilated positron fraction
@@ -308,11 +577,11 @@ class Sample:
         # legacy approach
         else:
             # iterate over boundaries
-            ls_model = np.zeros(len(energies))
-            ls_eff = np.zeros(len(energies))
+            ls_model = np.zeros(n_energies)
+            ls_eff = np.zeros(n_energies)
             r = 0
 
-            for i in range(len(self.layers) + 1):
+            for i in range(n_layers + 1):
                 """
                 Iterating through layers. The lineshape index is shifted by one,
                 since the first value is used for the surface.
@@ -330,149 +599,23 @@ class Sample:
 
                 r = diffusion_rate_r[i] / (1 - diffusion_rate_l[i] * r)
 
-        if self.epithermal:
+        if self.epithermal_correction:
             # fraction of epithermal positrons, uses the offset values calculated previously
-            epi_frac = np.zeros_like(energies)
+            epi_frac = np.zeros(n_energies)
 
-            for i, e in enumerate(energies):
+            for i, e in enumerate(implantation_energies):
                 for j, layer in enumerate(self.layers):
                     epi_frac[i] += integrate.quad(lambda z: layer.implantation_profile(z+offsets[i, j], e) *
-                                                            np.exp(-(z+offsets[i, j])/self.parameters["l_epi"].value),
-                                                  0, layer.get_thickness())[0]
+                                                            np.exp(-(z+offsets[i, j])/self.parameters["diffusion_length_epithermal"].value),
+                                                  0, layer.thickness)[0]
 
             if self.used_markov_to_fit:
                 markov_vector_old = self.markov_vector.copy()
-                self.markov_vector = np.zeros((len(energies), len(self.layers)+len(self.surfaces) + 1))
+                self.markov_vector = np.zeros((n_energies, n_layers + len(self.surfaces) + 1))
                 self.markov_vector[:, 0] = epi_frac
-                self.markov_vector[:, 1:] = markov_vector_old * np.tile((1 - epi_frac), (len(self.layers)+len(self.surfaces), 1)).T
+                self.markov_vector[:, 1:] = markov_vector_old * np.tile((1 - epi_frac), (n_layers + len(self.surfaces), 1)).T
 
             # correct lineshape for epithermal positrons
-            ls_model = ls_model * (1 - epi_frac) + self.parameters["lineshape_epi"].value * epi_frac
+            ls_model = ls_model * (1 - epi_frac) + self.parameters["lineshape_epithermal"].value * epi_frac
 
         return ls_model
-
-    def show_imp_ann_fracs(self, save=True, show=False, names_layer=None, 
-                           taglines=None, figtype="pdf",
-                           fontsize=11,
-                           figsize=(5.8476, 2.5),
-                           channel_colors=['lightsteelblue', 'darkseagreen', 'midnightblue', "sienna"],
-                           savename="imp_ann_frac_plot", axis=None):
-        """Display Layer distribution of implanted and annihilated positrons.
-
-        Parameters
-        ----------
-        show : bool
-            Show plot to user (default is False).
-        save : bool
-            Save figutr to file (default is True).
-        names_layer : list(str)
-            Labels of the Layers.
-        taglines : list(list(int(), float()))
-            List of vertical lines to draw. Each line is described by a list
-            containing an integer desgination the layer and a float (in units 
-            of keV) giving the energy at which it is to be drawn.
-        fontsize : int
-            (default is 11)
-        figsize : tuple(float(), float())
-            Figuresize (default is (5.8476, 2.5)).
-        channel_colors : list(str()), optional
-            (Default is ['lightsteelblue', 'darkseagreen'])
-        savename : str, optional
-            (default is "imp_ann_frac_plot.pdf"
-        """
-
-        if type(self.markov_vector) == bool:
-            err = ("Cannot create plot of implanted and annihilated fractions "
-                   "without modelling diffusion. Call Sample.fit() or "
-                   "Sample.model_diffusion() first.")
-            raise TypeError(err)
-
-        imp_energy = self.measurement_energies
-        #annihilation fractions as a function of energy (result of LIMPID fit)
-        f_channel = []
-        names_channel = []
-        if self.epithermal:
-            epi = 1
-            f_epithermal = self.markov_vector[:,0]
-            f_channel.append(f_epithermal)
-            f_surface = self.markov_vector[:,1]
-            names_channel.append("epithermal")
-        else:
-            epi = 0
-            f_surface = self.markov_vector[:,0]
-        f_channel.append(f_surface)
-        names_channel.append("surface")
-        for i,layer in enumerate(self.layers):
-            f_channel.append(self.markov_vector[:,epi+1+i])
-            makhov_params = layer.implantation_profile.params
-            if names_layer:
-                names_channel.append(names_layer[i])
-            else:
-                names_channel.append(f"layer{i}") 
-        
-        # configure matplotlib
-        ml = MultipleLocator(0.1)
-        plt.rcParams['font.size'] = fontsize
-        plt.rcParams['figure.figsize'] = figsize
-        if not show:
-            matplotlib.use("pgf")
-            matplotlib.rcParams.update({
-                "pgf.texsystem": "pdflatex",
-                'font.family': 'serif',
-                'text.usetex': True,
-                'pgf.rcfonts': False,
-            })
-        
-        # make plots
-        if not axis is None:
-            axs = axis
-        else:
-            fig, axs = plt.subplots(2, 1, sharex=True)
-        # implantation fractions
-        f_imp = self.implantation_fractions
-        f = np.zeros(np.size(f_imp[0]))
-        for f_lay,tag,col in zip(f_imp, names_channel, channel_colors):
-            f += f_lay 
-            axs[0].plot(imp_energy, f, linestyle='-', marker='', color='black')
-            axs[0].fill_between(x=imp_energy, y1 =f-f_lay, y2=f, color=col, label=tag)
-        axs[0].set_ylabel('Implantation \n fractions', fontsize=9)
-        axs[0].set_xlim(min(imp_energy), max(imp_energy))
-        axs[0].set_ylim(0.0, 1.01)
-        axs[0].xaxis.set_ticks_position('top')
-        axs[0].yaxis.set_minor_locator(ml)
-        axs[0].grid(which='both', linestyle='--')
-        # annihilation fractions
-        f = np.zeros(np.size(f_channel[0]))
-        channel_colors.insert(0, "grey")
-        n_l = 0
-        for f_ch, tag, col in zip(f_channel, names_channel, channel_colors):
-            f += f_ch
-            axs[1].plot(imp_energy, f, color='black')
-            axs[1].fill_between(x=imp_energy, y1=f-f_ch, y2=f, color=col, label=tag)
-            if taglines:
-                for l in taglines:
-                    if n_l == l[0]:
-                        e = l[1]
-                        lymin = np.interp(e, imp_energy, f-f_ch)
-                        lymax = np.interp(e, imp_energy, f)
-                        axs[1].vlines(e, ymin=lymin, ymax=lymax, color='steelblue')
-                        axs[1].text(e, 0.62, f'{e:.1f} keV', horizontalalignment='center', fontsize = 8) #, backgroundcolor='lightsteelblue')
-            n_l += 1
-        axs[1].set_xlabel('Implantation energy / keV')
-        axs[1].set_ylabel('Annihilation\nfractions', fontsize=9)
-        axs[1].set_ylim(1.01, 0)
-        axs[1].yaxis.set_minor_locator(ml)
-        axs[1].grid(which='both', linestyle='--')
-        if axis is None:
-            plt.tight_layout()
-            plt.legend()
-            fig.subplots_adjust(hspace=.0)
-        if save and (axis is None):
-            if figtype == "pgf":
-                matplotlib.use("pgf")
-            savename += "." + figtype
-            print(savename)
-            plt.savefig(savename)
-        if show and not (figtype == "pgf"):
-            plt.show()
-        return axs
