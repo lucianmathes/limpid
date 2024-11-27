@@ -13,3 +13,14 @@ LIMPID helps you with analyzing your positron annihilation depth profiles. It wi
 # Speed things up using a C library!
 
     sudo apt-get install libgsl-dev
+
+# Installation
+
+## In User Mode
+
+### Via Package index of gitlab.lrz.de 
+
+```
+python3 -m pip install --upgrade pip
+python3 -m pip install limpid --index-url https://gitlab+deploy-token-2044:gldt-mTjywbYYyhsXerAJys29@gitlab.lrz.de/api/v4/projects/113374/packages/pypi/simple
+```
