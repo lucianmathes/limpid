@@ -7,7 +7,7 @@ authors = [{name = "Lucian Mathes", email = "lucian.mathes@tum.de"},
 	   {name = "Michael Goeldl"}
 ] 
 description = "A package for fitting positron annihilation Doppler broadening depth profiles."
-dependencies = [   "numpy", "scipy", "matplotlib", "numba" ] 
+dependencies = [ "lmfit", "numpy", "scipy", "matplotlib", "numba" ] 
 classifiers = [  "Development Status :: 2 - Pre-Alpha",  
 		"Environment :: Console",  
 		"Intended Audience :: Science/Research",  
