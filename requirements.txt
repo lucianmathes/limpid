@@ -1,7 +1,0 @@
-setuptools
-lmfit
-numpy
-numba
-scipy
-coverage
-matplotlib
