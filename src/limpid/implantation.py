@@ -9,41 +9,87 @@ from ctypes import *
 
 PATH_TO_CMAKHOV_LIBRARY = os.path.expanduser("~/.limpid/makhov.so")
 
-class ImplantationProfile(object):
+class ImplantationProfile():
+    """A parent class for all types of positron implantation profile.
 
-    def __init__(self, func, params):
-        self.func = func
-        self.params = params
+    Attributes:
+      model_function: The continuous positron implantation model function.
+      parameters: Model specific parameters for the given type of material.
+    """
+
+    def __init__(self, model_function, parameters):
+        """Initializes the implantation profile.
+
+        Args:
+          model_function: The positron implantation model function. Must be
+            continuous.
+          parameters: Model specific parameters for the given type of material.
+        """
+
+        self.model_function = model_function
+        self.parameters = parameters
 
     def __call__(self, z, energy):
-        return self.func(z, energy, *self.params)
+        """Evaluates the implantation profile at the given depth and energy."""
 
-    def set_params(self, params):
-        self.params = params
+        return self.model_function(z, energy, *self.parameters)
 
     def get_depth(self, implanted, energy):
-        # TODO for each ImplantationProfile independently, or one could implement a general root-finding algorithm
-        #  for this parent class
+        """Calculates the depth for a given fraction of positrons implanted."""
+
+        # TODO for each ImplantationProfile independently, or one could
+        # implement a general root-finding algorithm for this parent class
         pass
 
 
 class MakhovProfile(ImplantationProfile):
+    """Wrapper for the Makhov implantation profile model function.
 
-    def __init__(self, params):
-        super().__init__(makhov_profile, params)
+    Attributes:
+      model_function: The implantation model function (for electrons) defined
+        in [Makhov]_.
+      parameters: Model specific parameters for the given type of material.
 
-    def get_depth(self, implanted, energy):
-        rho, a, n, m = self.params
-        return makhov_depth(rho, a, n, m, implanted, energy)
+    References:
+      .. [Makhov] A.F. Makhov, "The penetration of electrons into solids. 2.
+                  The distribution of electrons in Depth", Sov. Pys. Solid
+                  State, Vol. 2, Number 9, pp1942-1944, 1960.
+
+    """
+
+    def __init__(self, parameters):
+        super().__init__(self.makhov_profile, parameters)
+
+    @staticmethod
+    @cache
+    @njit(float64(float64, float64, float64, float64, float64, float64), cache=True)
+    def makhov_profile(z, e, rho, a, n, m):
+        z_avg = a / rho * e ** n * 10
+        z_0 = z_avg / math.gamma(1 / m + 1)
+
+        return (m * z ** (m - 1)) / (z_0 ** m) * np.exp(-(z / z_0) ** m)
+
+    @staticmethod
+    @cache
+    @njit(float64(float64, float64, float64, float64, float64, float64), cache=True)
+    def get_depth(implanted, energy, rho, a, n, m):
+        z_avg = a / rho * energy ** n * 10
+        z_0 = z_avg / math.gamma(1 / m + 1)
+
+        # deals with infinite offsets, the error made by this implementation is negligible
+        if implanted > 1 - 1E-15:
+            implanted = 1 - 1E-15
+
+        return z_0 * np.power(-np.log(1 - implanted), 1 / m)
 
 
 class CMakhovProfile(ImplantationProfile):
 
-    def __init__(self, params):
-        super().__init__(makhov_profile, params)
+    def __init__(self, parameters):
+        super().__init__(makhov_profile, parameters)
 
     def get_depth(self, implanted, energy):
-        rho, a, n, m = self.params
+        rho, a, n, m = self.parameters
         return makhov_depth(rho, a, n, m, implanted, energy)
 
     def solve_first_diffusion_step(self, diffusionlength, thickness, precision, energies, prev_implanted):
@@ -70,31 +116,9 @@ class CMakhovProfile(ImplantationProfile):
         c_implanted = np.zeros_like(energies)
         offsets = np.zeros_like(energies)
 
-        rho, a, n, m = self.params
+        rho, a, n, m = self.parameters
 
         liblimpid.makhov_integration_func(num_of_e, c_left, c_right, c_ann, c_implanted, offsets, prev_implanted, energies,
                                           thickness, rho, a, n, m, u, prec_exp)
 
         return c_left, c_right, c_ann, c_implanted, offsets
-
-
-@cache
-@njit(float64(float64, float64, float64, float64, float64, float64), cache=True)
-def makhov_profile(z, e, rho, a, n, m):
-    z_avg = a / rho * e ** n * 10
-    z_0 = z_avg / math.gamma(1 / m + 1)
-
-    return (m * z ** (m - 1)) / (z_0 ** m) * np.exp(-(z / z_0) ** m)
-
-
-@cache
-@njit(float64(float64, float64, float64, float64, float64, float64), cache=True)
-def makhov_depth(rho, a, n, m, implanted, energy):
-    z_avg = a / rho * energy ** n * 10
-    z_0 = z_avg / math.gamma(1 / m + 1)
-
-    # deals with infinite offsets, the error made by this implementation is negligible
-    if implanted > 1 - 1E-15:
-        implanted = 1 - 1E-15
-
-    return z_0 * np.power(-np.log(1 - implanted), 1 / m)

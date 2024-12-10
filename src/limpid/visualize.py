@@ -1,16 +1,21 @@
 import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
-from matplotlib.ticker import MultipleLocator
 
+from scipy import integrate
+
+import limpid
 from .limpid import Sample
-from .utils import calc_implantation_profile
 
 
-def check_sample_status(sample: Sample):
-    """
-    Checks if the sample contains a valid fitting result, expressed by the sample.status flag,
-    which is set by the fitting procedure.
+def check_sample_status(sample: limpid.Sample):
+    """Checks if the sample contains a valid fitting result.
+
+    Args:
+      sample: The Sample object containing all the data.
+
+    Raises:
+      RuntimeError: The Sample object has not been fit (successfully).
     """
 
     if sample.fit_status < -1:
@@ -19,28 +24,118 @@ def check_sample_status(sample: Sample):
     elif sample.fit_status < 1:
         print('The fit terminated before any fitting condition was satisfied.')
 
+def calc_implantation_profile(
+    sample: Sample,
+    implantation_energy: float,
+    num_depth: int = 100
+) -> tuple[np.ndarray, np.ndarray]:
+    """Evaluates the combined implantation profile.
+
+    Calculates the combined implantation profile for a given sample at a given
+    energy. The maximum implantation depth is automatically calculated
+    (cut-off @ 99.9%).
+
+    Args:
+      sample: The Sample object containing all the data.
+      implantation_energy: The positron implantation energy for which the
+        implantation profile is calculated.
+      num_depth: The number of depths evaluated.
+
+    Returns:
+      Two numpy arrays containing the implantation depth values and the
+      implantation profile evaluated at those depths.
+    """
+
+    layers = sample.layers
+    max_depth = np.inf
+    implanted = [0]
+    offsets = []
+
+    for i, layer in enumerate(layers):
+
+        if i == 0:
+            offset = 0
+        else:
+            offset = layer.implantation_profile.get_depth(sum(implanted), implantation_energy)
+
+        offsets.append(offset)
+
+        max_layer_depth = layer.implantation_profile.get_depth(0.999, implantation_energy)
+
+        if max_layer_depth < layer.thickness + offset:
+            max_depth = max_layer_depth - offset
+            implanted.append(0.999 - implanted[-1])
+
+        else:
+            implanted.append(integrate.quad(lambda z: layer.implantation_profile(z + offset, implantation_energy), 0,
+                                            layer.thickness, epsabs=1e-5, epsrel=1e-5)[0] - implanted[-1])
+
+    def combined_implantation_profile(z):
+
+        lower_bound = 0
+        total_depth = 0
+
+        for offset, layer in zip(offsets, layers):
+            total_depth += layer.thickness
+            if lower_bound <= z <= total_depth:
+                return layer.implantation_profile(z + offset, implantation_energy)
+            else:
+                lower_bound = total_depth
+
+    z = np.linspace(0, max_depth, num_depth)
+
+    return z, [combined_implantation_profile(z_val) for z_val in z]
 
 def fit_result(sample: Sample):
+    """Shows a plot of the data and fit result.
+
+    Args:
+      sample: The Sample object containing all the data.
+
+    Returns:
+      A tuple of the matplotlib Figure and Axis objects.
     """
-    Simple plot of the fit result.
-    """
+
     check_sample_status(sample)
 
-    plt.errorbar(sample.measurement_energies, sample.measurement_lineshape, sample.measurement_lineshape_delta,
-                 ls='', capsize=3, label="data")
-    energies = np.linspace(sample.measurement_energies[0], sample.measurement_energies[-1], 120)
-    plt.plot(energies, sample.model_diffusion(energies), label="fit")
-    plt.legend()
-    plt.xlabel("Energy (keV)")
-    plt.ylabel("Lineshape")
-    plt.title(sample.name)
-    plt.tight_layout()
+    fig, ax = plt.subplots()
+    ax.errorbar(sample.measurement_energies, sample.measurement_lineshape,
+                sample.measurement_lineshape_delta, ls='', capsize=3,
+                label="data")
+    energies = np.linspace(sample.measurement_energies[0],
+                           sample.measurement_energies[-1], 120)
+    ax.plot(energies, sample.model_diffusion(energies), label='fit')
+    ax.legend()
+    ax.set_xlabel('Energy / keV')
+    ax.set_ylabel('Lineshape')
+    fig.suptitle(sample.name)
     plt.show()
 
-def detailed_fit_result(sample: Sample, output_dir="", profile_energies=("mid", "high"), show=True):
+    return fig, ax
+
+def detailed_fit_result(
+    sample: limpid.Sample,
+    output_dir: str = '',
+    profile_energies: tuple = ('mid', 'high'),
+    show: bool = True,
+):
+    """Shows detailed plots of the fit result.
+
+    Creates a matplotlib figure containing four plots: The input data with the
+    best fit obtained, the fit residuals, and the implantation profiles of two
+    selected energies.
+
+    Args:
+      sample: The Sample object containing all the data.
+      output_dir: The directory to save the figure in.
+      profile_energies: A tuple of two selected implantation energies. The
+        figure will contain the corresponding implantation profiles.
+      show: Show a popup window containing the plot.
+
+    Returns:
+      A tuple of the matplotlib Figure and Axes objects.
     """
-    More detailed plots of the fit result.
-    """
+
     check_sample_status(sample)
 
     assert len(profile_energies) == 2
@@ -58,81 +153,74 @@ def detailed_fit_result(sample: Sample, output_dir="", profile_energies=("mid", 
     else:
         raise TypeError(f"{profile_energies[1]} is neither float nor int.")
 
-    fig_main, ((ax1, ax3), (ax2, ax4)) = plt.subplots(2, 2)
-    fig_main.suptitle(sample.name)
+    fig, axs = plt.subplots(2, 2)
+    fig.suptitle(sample.name)
 
     energies = np.linspace(sample.measurement_energies[0], sample.measurement_energies[-1], 120)
 
     # fit result
-    ax1.errorbar(sample.measurement_energies, sample.measurement_lineshape, sample.measurement_lineshape_delta,
+    axs[0,0].errorbar(sample.measurement_energies, sample.measurement_lineshape, sample.measurement_lineshape_delta,
                  ls='', capsize=3, label="data")
-    ax1.plot(energies, sample.model_diffusion(energies), label="fit")
-    ax1.set(ylabel="S parameter")
-    ax1.legend()
+    axs[0,0].plot(energies, sample.model_diffusion(energies), label="fit")
+    axs[0,0].set(ylabel="S parameter")
+    axs[0,0].legend()
 
     # residuals
     residuals = sample.model_diffusion(sample.measurement_energies) - sample.measurement_lineshape
     cumres = np.cumsum(residuals)
     res_and_cumres = np.concatenate((residuals, cumres))
-    ax2.plot(sample.measurement_energies, np.zeros_like(sample.measurement_energies), color="black")
-    ax2.plot(sample.measurement_energies, cumres, color='orange', linestyle='--', label='cumulative sum')
-    ax2.scatter(sample.measurement_energies, residuals, label='residuals')
+    axs[0,1].plot(sample.measurement_energies, np.zeros_like(sample.measurement_energies), color="black")
+    axs[0,1].plot(sample.measurement_energies, cumres, color='orange', linestyle='--', label='cumulative sum')
+    axs[0,1].scatter(sample.measurement_energies, residuals, label='residuals')
     ymax = 1.15 * np.max(np.abs(res_and_cumres))
-    ax2.set_ylim(-ymax, ymax)
-    ax2.legend()
-    ax2.set(xlabel="E (keV)")
+    axs[0,1].set_ylim(-ymax, ymax)
+    axs[0,1].legend()
+    axs[0,1].set(xlabel="E (keV)")
 
     # mid energy profile
-    z_mid, p_mid = calc_implantation_profile(sample, e_0, 100)
-    ax3.plot(z_mid, p_mid, label=str(round(e_0, 3)) + " keV")
-    ax3.legend()
-    ax3.yaxis.set_label_position("right")
-    ax3.set(ylabel="Implanted fraction")
-    ax3.yaxis.tick_right()
+    z_mid, p_mid = calc_implantation_profile(sample, e_0)
+    axs[1,0].plot(z_mid, p_mid, label=str(round(e_0, 3)) + " keV")
+    axs[1,0].legend()
+    axs[1,0].yaxis.set_label_position("right")
+    axs[1,0].set(ylabel="Implanted fraction")
+    axs[1,0].yaxis.tick_right()
 
-    z_high, p_high = calc_implantation_profile(sample, e_1, 100)
-    ax4.plot(z_high, p_high, label=str(round(e_1, 3)) + " keV")
-    ax4.legend()
-    ax4.yaxis.set_label_position("right")
-    ax4.yaxis.tick_right()
-    ax4.set(ylabel="Implanted fraction")
-    ax4.set(xlabel="Depth (nm)")
+    z_high, p_high = calc_implantation_profile(sample, e_1)
+    axs[1,1].plot(z_high, p_high, label=str(round(e_1, 3)) + " keV")
+    axs[1,1].legend()
+    axs[1,1].yaxis.set_label_position("right")
+    axs[1,1].yaxis.tick_right()
+    axs[1,1].set(ylabel="Implanted fraction")
+    axs[1,1].set(xlabel="Depth (nm)")
 
-    #fig_main.tight_layout()
     savename = sample.name.split(".")[0]
     plt.savefig(output_dir + f"limpid_out_detailed_{savename}")
     if show:
         plt.show()
-    plt.close()
 
-def show_imp_ann_fracs(sample, save=True, show=False, names_layer=None, 
-                       taglines=None, figtype="pdf",
-                       fontsize=11,
-                       figsize=(5.8476, 2.5),
-                       channel_colors=['lightsteelblue', 'darkseagreen', 'midnightblue', "sienna"],
-                       savename="imp_ann_frac_plot", axis=None):
-    """Display Layer distribution of implanted and annihilated positrons.
+    return fig, axs
 
-    Parameters
-    ----------
-    show : bool
-        Show plot to user (default is False).
-    save : bool
-        Save figutr to file (default is True).
-    names_layer : list(str)
-        Labels of the Layers.
-    taglines : list(list(int(), float()))
-        List of vertical lines to draw. Each line is described by a list
-        containing an integer desgination the layer and a float (in units 
-        of keV) giving the energy at which it is to be drawn.
-    fontsize : int
-        (default is 11)
-    figsize : tuple(float(), float())
-        Figuresize (default is (5.8476, 2.5)).
-    channel_colors : list(str()), optional
-        (Default is ['lightsteelblue', 'darkseagreen'])
-    savename : str, optional
-        (default is "imp_ann_frac_plot.pdf"
+def plot_fractions(
+    sample: limpid.Sample,
+    save: bool = True,
+    show: bool = True,
+    savename: str = "positron_fractions.pdf",
+    fig: plt.Figure|None = None,
+):
+    """Displays the distribution of implanted and annihilated positrons.
+
+    Derives the positron implantation and annihilation fractions from a
+    limpid.Sample object and plots them in a cumulative style.
+
+    Args:
+      sample: The Sample object containing all the data.
+      show: Show a popup window containing the plot.
+      save: Save the figure to a file.
+      savename : Filepath to save the figure at.
+      fig: matplotlib.pyplot.Figure instance used for plotting.
+
+    Returns:
+      A tuple of the matplotlib Figure and Axes objects.
     """
 
     if type(sample.markov_vector) == bool:
@@ -141,92 +229,56 @@ def show_imp_ann_fracs(sample, save=True, show=False, names_layer=None,
                "Sample.model_diffusion() first.")
         raise TypeError(err)
 
-    imp_energy = sample.measurement_energies
-    #annihilation fractions as a function of energy (result of LIMPID fit)
-    f_channel = []
-    names_channel = []
+    implantation_energies = sample.measurement_energies
+    annihilation_fractions = sample.markov_vector.transpose()
+    annihilation_channels = ['surface', *[l.name for l in sample.layers]]
+
     if sample.epithermal_correction:
-        epi = 1
-        f_epithermal = sample.markov_vector[:,0]
-        f_channel.append(f_epithermal)
-        f_surface = sample.markov_vector[:,1]
-        names_channel.append("epithermal")
+        annihilation_channels.insert(0, 'epithermal')
+        skip_colors = 2
     else:
-        epi = 0
-        f_surface = sample.markov_vector[:,0]
-    f_channel.append(f_surface)
-    names_channel.append("surface")
-    for i,layer in enumerate(sample.layers):
-        f_channel.append(sample.markov_vector[:,epi+1+i])
-        makhov_params = layer.implantation_profile.params
-        if names_layer:
-            names_channel.append(names_layer[i])
-        else:
-            names_channel.append(f"layer{i}") 
-    
-    # configure matplotlib
-    ml = MultipleLocator(0.1)
-    plt.rcParams['font.size'] = fontsize
-    plt.rcParams['figure.figsize'] = figsize
-    if not show:
-        matplotlib.use("pgf")
-        matplotlib.rcParams.update({
-            "pgf.texsystem": "pdflatex",
-            'font.family': 'serif',
-            'text.usetex': True,
-            'pgf.rcfonts': False,
-        })
-    
-    # make plots
-    if not axis is None:
-        axs = axis
+        skip_colors = 1
+
+    colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+    while len(colors) < len(annihilation_channels):
+        colors += colors
+
+    if not fig is None:
+        axs = fig.get_axes()
     else:
         fig, axs = plt.subplots(2, 1, sharex=True)
+
     # implantation fractions
-    f_imp = sample.implantation_fractions
-    f = np.zeros(np.size(f_imp[0]))
-    for f_lay,tag,col in zip(f_imp, names_channel, channel_colors):
-        f += f_lay 
-        axs[0].plot(imp_energy, f, linestyle='-', marker='', color='black')
-        axs[0].fill_between(x=imp_energy, y1 =f-f_lay, y2=f, color=col, label=tag)
-    axs[0].set_ylabel('Implantation \n fractions', fontsize=9)
-    axs[0].set_xlim(min(imp_energy), max(imp_energy))
+    cumsum_implantation = np.zeros_like(sample.implantation_fractions[0])
+    for i, layer in enumerate(sample.layers):
+        cumsum_implantation += sample.implantation_fractions[i]
+        axs[0].plot(implantation_energies, cumsum_implantation, linestyle='-',
+                    marker='', color='black')
+        axs[0].fill_between(x=implantation_energies,
+                    y1=cumsum_implantation-sample.implantation_fractions[i],
+                    y2=cumsum_implantation, color=colors[i+skip_colors])
+    axs[0].set_ylabel('Implantation\nfractions')
+    axs[0].set_xlim(min(implantation_energies), max(implantation_energies))
     axs[0].set_ylim(0.0, 1.01)
     axs[0].xaxis.set_ticks_position('top')
-    axs[0].yaxis.set_minor_locator(ml)
-    axs[0].grid(which='both', linestyle='--')
+
     # annihilation fractions
-    f = np.zeros(np.size(f_channel[0]))
-    channel_colors.insert(0, "grey")
-    n_l = 0
-    for f_ch, tag, col in zip(f_channel, names_channel, channel_colors):
-        f += f_ch
-        axs[1].plot(imp_energy, f, color='black')
-        axs[1].fill_between(x=imp_energy, y1=f-f_ch, y2=f, color=col, label=tag)
-        if taglines:
-            for l in taglines:
-                if n_l == l[0]:
-                    e = l[1]
-                    lymin = np.interp(e, imp_energy, f-f_ch)
-                    lymax = np.interp(e, imp_energy, f)
-                    axs[1].vlines(e, ymin=lymin, ymax=lymax, color='steelblue')
-                    axs[1].text(e, 0.62, f'{e:.1f} keV', horizontalalignment='center', fontsize = 8) #, backgroundcolor='lightsteelblue')
-        n_l += 1
-    axs[1].set_xlabel('Implantation energy / keV')
-    axs[1].set_ylabel('Annihilation\nfractions', fontsize=9)
+    cumsum_annihilation = np.zeros_like(sample.implantation_fractions[0])
+    for i, channel_name in enumerate(annihilation_channels):
+        cumsum_annihilation += annihilation_fractions[i]
+        axs[1].plot(implantation_energies, cumsum_annihilation, color='black')
+        axs[1].fill_between(x=implantation_energies,
+                y1=cumsum_annihilation-annihilation_fractions[i],
+                y2=cumsum_annihilation, color=colors[i], label=channel_name)
+    axs[1].set_xlabel('Positron implantation energy / keV')
+    axs[1].set_ylabel('Annihilation\nfractions')
     axs[1].set_ylim(1.01, 0)
-    axs[1].yaxis.set_minor_locator(ml)
-    axs[1].grid(which='both', linestyle='--')
-    if axis is None:
-        plt.tight_layout()
-        plt.legend()
-        fig.subplots_adjust(hspace=.0)
-    if save and (axis is None):
-        if figtype == "pgf":
-            matplotlib.use("pgf")
-        savename += "." + figtype
-        print(savename)
-        plt.savefig(savename)
-    if show and not (figtype == "pgf"):
+    axs[1].legend()
+    fig.subplots_adjust(hspace=.0)
+
+    if save:
+        plt.savefig(f'{savename}.pdf')
+    if show:
         plt.show()
-    return axs
+
+    return fig, axs

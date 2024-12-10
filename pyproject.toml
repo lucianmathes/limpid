@@ -1,7 +1,5 @@
 [project] 
 name = "limpid" 
-readme = "README.md"
-version = "0.1.4" 
 requires-python = ">=3.10"
 authors = [{name = "Lucian Mathes", email = "lucian.mathes@tum.de"},
 	   {name = "Michael Goeldl"}
@@ -17,6 +15,11 @@ classifiers = [  "Development Status :: 2 - Pre-Alpha",
 		"Programming Language :: Python :: 3",  
 		"Topic :: Scientific/Engineering :: Physics" 
 ]
+dynamic = ["version", "readme"]
+
+[tool.setuptools.dynamic]
+version = {attr = "limpid.__version__"}
+readme = {file = "README.md"}
 
 [build-system]
 requires = [

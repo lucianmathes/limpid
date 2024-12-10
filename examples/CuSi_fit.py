@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from limpid import Sample, Layer
-from limpid.visualize import detailed_fit_result, show_imp_ann_fracs
+from limpid.visualize import detailed_fit_result, plot_fractions
 
 
 si = Layer(density=2.33,
@@ -10,7 +10,7 @@ cu = Layer(8.96, (2.84, 1.67, 1.73))
 cr = Layer(7.15, (2.74, 1.67, 1.76))
 s = Sample([cu, si], epithermal_correction=False)
 
-filepath = "./CuSi_data.csv"
+filepath = "./data/CuSi_data.csv"
 dataset = np.transpose(np.genfromtxt(filepath, delimiter=","))
 e_data = dataset[0]/1000  # dataset is in eV, but limpid assumes keV !!!!
 s_data = dataset[1]
@@ -35,11 +35,11 @@ s.parameters["diffusion_length_2"].vary = False
 s.parameters["diffusion_coefficient_2"].vary = False
 
 
-out = s.fit(s_data, ds_data, e_data, verbose=2, markov_chain=True, max_nfev=100)
+out = s.fit(e_data, s_data, ds_data, verbose=1, markov_chain=True, max_nfev=100)
 print(out.init_values)
 print(out.params)
 
 #res = s.model_diffusion([1, 2, 3, 4, 5], markov_chain=True)
 #print(res)
-show_imp_ann_fracs(s, show=True)
+plot_fractions(s)
 #detailed_fit_result(s)
