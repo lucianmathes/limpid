@@ -5,7 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.1.5] - 2024-11-30
+## [0.2.0] - 2025-01-08
+### Added
+- Option to plot the initial guess.
+- Option to plot implantation and annihilation fractions non-cumulative.
+- Example data that can be loaded using the name of the dataset.
+- README section on a simple application using example data.
+
+### Changed
+- Fix diffusion rates at very low energies by cutting the integration range.
+- Include the initial guess in the result plot by default.
+- All functions of visualize.py and the example_data submodule can now be accessed like top-level functions of limpid.
+
+## [0.1.5] - 2024-12-10
 ### Added
 - Documentation for every class and function in limpid.py
 - Installation instructions for development.

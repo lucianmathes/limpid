@@ -1,4 +1,5 @@
 import time
+import copy
 import lmfit
 import numpy as np
 
@@ -174,8 +175,8 @@ class Layer:
             denominator = (np.exp(u * thickness) - np.exp(- u * thickness))
             return numerator / denominator
 
-        def integral(f, e):
-            return integrate.quad(f, 0, self.thickness, args=(e,),
+        def integral(f, max_depth):
+            return integrate.quad(f, 0, min(max_depth, self.thickness),
                                   epsabs=prec_exp, epsrel=prec_exp)[0]
 
         # Offset of the implantation profile. Depth until which the integral is
@@ -191,12 +192,15 @@ class Layer:
             offset = self.implantation_profile.get_depth(
                              previously_implanted[i], energy,
                              *self.implantation_profile.parameters)
+            max_depth = self.implantation_profile.get_depth(
+                             1 - 1e-15, energy,
+                             *self.implantation_profile.parameters)
             offsets[i] = offset
-            c_left[i] = integral(lambda z, e: self.implantation_profile(z + offset, e) *
-                    concentration_left(z, self.thickness, 1/self.diffusion_length), energy)
-            c_right[i] = integral(lambda z, e: self.implantation_profile(z + offset, e) *
-                    concentration_right(z, self.thickness, 1/self.diffusion_length), energy)
-            c_implanted[i] = integral(lambda z, e: self.implantation_profile(z + offset, e), energy)
+            c_left[i] = integral(lambda z: self.implantation_profile(z + offset, energy) *
+                    concentration_left(z, self.thickness, 1/self.diffusion_length), max_depth)
+            c_right[i] = integral(lambda z: self.implantation_profile(z + offset, energy) *
+                    concentration_right(z, self.thickness, 1/self.diffusion_length), max_depth)
+            c_implanted[i] = integral(lambda z: self.implantation_profile(z + offset, energy), max_depth)
             c_annihilated[i] = c_implanted[i] - c_left[i] - c_right[i]
 
         return c_left, c_right, c_annihilated, c_implanted, offsets
@@ -362,7 +366,6 @@ class Sample:
         self.measurement_lineshape_delta = None
         #self.fit_result = None  # FitResult object from the fitting.py script
 
-
         # markov process
         self.markov_vector = False
         self.used_markov_to_fit = False
@@ -377,6 +380,12 @@ class Sample:
                                parameters=self.parameters,
                                precision=self.precision,
                                index=0)
+
+        # copy of self to save the initial guess
+        # Here we use a shallow copy to get parameter updates. We change it to
+        # a deep copy right before the fit.
+        self.initial_state = copy.copy(self)
+
         # add fit parameters for the surface
         self.parameters.add('lineshape_0', value=np.inf, vary=True, min=1E-15)
 
@@ -430,6 +439,70 @@ class Sample:
                                 vary=True, min=1E-15)
             self.parameters.add('diffusion_length_epithermal', value=1,
                                 vary=True, min=1E-5)
+
+    def calc_implantation_profile(
+        self,
+        implantation_energy: float,
+        num_depth: int = 100
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Evaluates the combined implantation profile.
+
+        Calculates the combined implantation profile for a given sample at a given
+        energy. The maximum implantation depth is automatically calculated
+        (cut-off @ 99.9%).
+
+        Args:
+          implantation_energy: The positron implantation energy for which the
+            implantation profile is calculated.
+          num_depth: The number of depths evaluated.
+
+        Returns:
+          Two numpy arrays containing the implantation depth values and the
+          implantation profile evaluated at those depths.
+        """
+
+        max_depth = np.inf
+        implanted = [0]
+        offsets = []
+
+        for i, layer in enumerate(self.layers):
+            if i == 0:
+                offset = 0
+            else:
+                offset = layer.implantation_profile.get_depth(
+                            np.sum(implanted), implantation_energy,
+                            *layer.implantation_profile.parameters)
+
+            offsets.append(offset)
+
+            max_layer_depth = layer.implantation_profile.get_depth(
+                                  0.999, implantation_energy,
+                                  *layer.implantation_profile.parameters)
+
+            if max_layer_depth < layer.thickness + offset:
+                max_depth = max_layer_depth - offset
+                implanted.append(0.999 - implanted[-1])
+
+            else:
+                implanted.append(integrate.quad(
+                    lambda z: layer.implantation_profile(z + offset, implantation_energy),
+                    0, layer.thickness, epsabs=1e-5, epsrel=1e-5)[0] - implanted[-1])
+
+        def combined_implantation_profile(z):
+
+            lower_bound = 0
+            total_depth = 0
+
+            for offset, layer in zip(offsets, self.layers):
+                total_depth += layer.thickness
+                if lower_bound <= z <= total_depth:
+                    return layer.implantation_profile(z + offset, implantation_energy)
+                else:
+                    lower_bound = total_depth
+
+        z = np.linspace(0, max_depth, num_depth)
+
+        return z, [combined_implantation_profile(z_val) for z_val in z]
 
     def model_diffusion(self,
                         implantation_energies: tuple[float, ...],
@@ -494,6 +567,7 @@ class Sample:
             c_left, c_right, c_annihilated, c_implanted, offset = \
                 layer.solve_first_diffusion_step(implantation_energies,
                                                  implanted)
+
             on_boundaries[:, i] += c_left
             on_boundaries[:, i + 1] += c_right
             annihilated[:, i] += c_annihilated
@@ -688,6 +762,8 @@ class Sample:
         Raises:
           RuntimeError: Tried to fit the Sample object twice.
         """
+
+        self.initial_state = copy.deepcopy(self)
 
         if markov_chain is not None:
             self.markov_chain = markov_chain
