@@ -49,6 +49,11 @@ def initial_guess(
       A tuple of the matplotlib Figure and Axis objects.
     """
 
+    # Set the epithermal initial guess otherwise done in Sample.fit().
+    if (sample.epithermal_correction
+        and sample.parameters['lineshape_epithermal'].value == np.inf):
+        sample.parameters['lineshape_epithermal'].value = lineshape[0]
+
     fig, ax = plt.subplots()
 
     if energies is not None:
@@ -90,9 +95,15 @@ def fit_result(sample: Sample, show_init: bool = True):
     check_sample_status(sample)
 
     fig, ax = plt.subplots()
-    ax.errorbar(sample.measurement_energies, sample.measurement_lineshape,
-                sample.measurement_lineshape_delta, ls='', capsize=3,
-                label="data")
+    if sample.measurement_lineshape_delta is None:
+        ax.scatter(sample.measurement_energies, sample.measurement_lineshape,
+                   label="data")
+        # manually step forward in the color cycle, because scatter doesn't
+        ax.plot([])
+    else:
+        ax.errorbar(sample.measurement_energies, sample.measurement_lineshape,
+                    sample.measurement_lineshape_delta, ls='', capsize=3,
+                    label="data")
     energies = np.linspace(sample.measurement_energies[0],
                            sample.measurement_energies[-1], 120)
     if show_init:
@@ -153,10 +164,16 @@ def detailed_fit_result(
     energies = np.linspace(sample.measurement_energies[0], sample.measurement_energies[-1], 120)
 
     # fit result
-    axs[0,0].errorbar(sample.measurement_energies,
-                      sample.measurement_lineshape,
-                      sample.measurement_lineshape_delta,
-                      ls='', capsize=3, label='data')
+    if sample.measurement_lineshape_delta is None:
+        axs[0,0].scatter(sample.measurement_energies,
+                         sample.measurement_lineshape, label='data')
+        # manually step forward in the color cycle, because scatter doesn't
+        ax.plot([])
+    else:
+        axs[0,0].errorbar(sample.measurement_energies,
+                          sample.measurement_lineshape,
+                          sample.measurement_lineshape_delta,
+                          ls='', capsize=3, label='data')
     axs[0,0].plot(energies, sample.model_diffusion(energies), label='fit')
     axs[0,0].set_ylabel('S parameter')
     axs[0,0].set_xlabel('Implantation energy / keV')
@@ -224,6 +241,9 @@ def plot_fractions(
         raise TypeError(err)
 
     implantation_energies = sample.measurement_energies
+    energies = np.linspace(sample.measurement_energies[0],
+                           sample.measurement_energies[-1], 120)
+    sample.model_diffusion(energies)
     annihilation_fractions = sample.markov_vector.transpose()
     annihilation_channels = ['surface', *[l.name for l in sample.layers]]
 
@@ -247,9 +267,9 @@ def plot_fractions(
         cumsum_implantation = np.zeros_like(sample.implantation_fractions[0])
         for i, layer in enumerate(sample.layers):
             cumsum_implantation += sample.implantation_fractions[i]
-            axs[0].plot(implantation_energies, cumsum_implantation, linestyle='-',
+            axs[0].plot(energies, cumsum_implantation, linestyle='-',
                         marker='', color='black')
-            axs[0].fill_between(x=implantation_energies,
+            axs[0].fill_between(x=energies,
                         y1=cumsum_implantation-sample.implantation_fractions[i],
                         y2=cumsum_implantation, color=colors[i+skip_colors])
 
@@ -257,8 +277,8 @@ def plot_fractions(
         cumsum_annihilation = np.zeros_like(sample.implantation_fractions[0])
         for i, channel_name in enumerate(annihilation_channels):
             cumsum_annihilation += annihilation_fractions[i]
-            axs[1].plot(implantation_energies, cumsum_annihilation, color='black')
-            axs[1].fill_between(x=implantation_energies,
+            axs[1].plot(energies, cumsum_annihilation, color='black')
+            axs[1].fill_between(x=energies,
                     y1=cumsum_annihilation-annihilation_fractions[i],
                     y2=cumsum_annihilation, color=colors[i], label=channel_name)
         axs[0].xaxis.set_ticks_position('top')
@@ -267,15 +287,15 @@ def plot_fractions(
         fig.subplots_adjust(hspace=.0)
     else:
         for i, layer in enumerate(sample.layers):
-            axs[0].plot(implantation_energies, sample.implantation_fractions[i], linestyle='-',
+            axs[0].plot(energies, sample.implantation_fractions[i], linestyle='-',
                         marker='', color=colors[i+skip_colors])
         for i, channel_name in enumerate(annihilation_channels):
-            axs[1].plot(implantation_energies, annihilation_fractions[i], color=colors[i], label=channel_name)
+            axs[1].plot(energies, annihilation_fractions[i], color=colors[i], label=channel_name)
         axs[0].set_ylim(-0.01, 1.01)
         axs[1].set_ylim(-0.01, 1.01)
 
     axs[0].set_ylabel('Implantation\nfractions')
-    axs[0].set_xlim(min(implantation_energies), max(implantation_energies))
+    axs[0].set_xlim(min(energies), max(energies))
     axs[1].set_xlabel('Positron implantation energy / keV')
     axs[1].set_ylabel('Annihilation\nfractions')
     axs[1].legend()
