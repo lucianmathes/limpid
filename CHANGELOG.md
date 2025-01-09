@@ -19,6 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix missing initial guess in plots of fits using epithermal correction.
 - Use finely-spaced energy for fraction plots instead of the energy provided by the data.
 
+### Removed
+- Unused data in the examples folder.
+
 ## [0.2.1] - 2025-01-08
 ### Added
 - Script for Example 1 referenced in the README.
