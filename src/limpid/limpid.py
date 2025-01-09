@@ -171,9 +171,14 @@ class Layer:
 
         @cache
         def concentration_right(z, thickness, u):
-            numerator = np.exp(u * z) - np.exp(- u * z)
             denominator = (np.exp(u * thickness) - np.exp(- u * thickness))
-            return numerator / denominator
+            if np.isinf(denominator):
+                # Avoid division inf / inf.
+                conc = 0
+            else:
+                numerator = np.exp(u * z) - np.exp(- u * z)
+                conc = numerator / denominator
+            return conc
 
         def integral(f, max_depth):
             return integrate.quad(f, 0, min(max_depth, self.thickness),
@@ -306,25 +311,25 @@ class Sample:
     contains all information necessary for the simulations.
 
     Attributes:
-        layers: A list of Layer objects representing the sample.
-        surface: A Surface object at the top of the sample.
-        name: A string containing the name of the sample.
-        implantation_model: A string containing the model used for
-          positron implantation.
-        epithermal_correction: A boolean indicating if a correction for
-          epithermal positrons is applied.
-        temperature: A float containing the sample temperature in K.
-        precision: An integer count of decimals used for computation.
-        parameters: An lmfit.Parameters object containing all (fixed and
-          varied) fit parameters.
-        fit_status: An integer representing the fit status. After fitting, its
-          value depends on the underlying solver. Initially -2, positive in
-          case of success.
+      layers: A list of Layer objects representing the sample.
+      surface: A Surface object at the top of the sample.
+      name: A string containing the name of the sample.
+      implantation_model: A string containing the model used for
+        positron implantation.
+      epithermal_correction: A boolean indicating if a correction for
+        epithermal positrons is applied.
+      temperature: A float containing the sample temperature in K.
+      precision: An integer count of decimals used for computation.
+      parameters: An lmfit.Parameters object containing all (fixed and
+        varied) fit parameters.
+      fit_status: An integer representing the fit status. After fitting, its
+        value depends on the underlying solver. Initially -2, positive in
+        case of success.
     """
 
     def __init__(
         self,
-        layers: tuple[Layer, ...],
+        layers: tuple[Layer, ...]|Layer,
         name: str = "",
         implantation_model: str = "makhov",
         epithermal_correction: bool = False,
@@ -335,21 +340,25 @@ class Sample:
         """Initializes the sample based on layers.
 
         Args:
-            layers: A list of Layer objects representing the sample.
-            name: Defines the name of the sample.
-            implantation_model: Defines the model used for positron
-              implantation.
-            epithermal_correction: If True a correction for epithermal
-              positrons is applied.
-            temperature: Defines the sample temperature in K.
-            precision: Defines the decimals used for computation, i.e., error
-              tolerance of the implantation profile integral and fit tolerance.
-              Default is 8, resulting in a tolerance of 10^(-8).
-            markov_chain: If True a markov chain approach is used to simulate
-              positron diffusion.
+          layers: A single Layer object or list of Layer objects representing
+            the sample.
+          name: Defines the name of the sample.
+          implantation_model: Defines the model used for positron
+            implantation.
+          epithermal_correction: If True a correction for epithermal
+            positrons is applied.
+          temperature: Defines the sample temperature in K.
+          precision: Defines the decimals used for computation, i.e., error
+            tolerance of the implantation profile integral and fit tolerance.
+            Default is 8, resulting in a tolerance of 10^(-8).
+          markov_chain: If True a markov chain approach is used to simulate
+            positron diffusion.
         """
 
-        self.layers = layers
+        if type(layers) == Layer:
+            self.layers = [layers]
+        else:
+            self.layers = layers
         self.name = name
         self.implantation_model = implantation_model
         self.epithermal_correction = epithermal_correction
@@ -391,7 +400,7 @@ class Sample:
 
         # for every layer: set the correct index and define the implantation
         # profile
-        for i, layer in enumerate(layers):
+        for i, layer in enumerate(self.layers):
             i += 1 # shift index by one to account for surface layer
             if layer.name == f'Layer {layer.index}':
                 layer.name = f'Layer {i}'
@@ -418,7 +427,7 @@ class Sample:
                         'and "cmakhov".')
                 raise NotImplementedError(err)
 
-            if i == len(layers):
+            if i == len(self.layers):
                 # last layer defaults to infinite thickness
                 if layer.thickness != np.inf:
                     wrn = (f'Invalid thickness ({layer.thickness}) for the '
@@ -730,10 +739,10 @@ class Sample:
         self,
         implantation_energies: np.ndarray,
         lineshape: np.ndarray,
-        lineshape_deltas: np.ndarray,
+        lineshape_deltas: np.ndarray|None = None,
         report_to: str = "./limpid-fit-report.txt",
         markov_chain: bool|None = None,
-        max_nfev: int = 100,
+        max_nfev: int = 200,
         verbose: int = 0,
     ) -> lmfit.minimizer.MinimizerResult:
         """Performs a fit to the data provided.
@@ -763,6 +772,12 @@ class Sample:
           RuntimeError: Tried to fit the Sample object twice.
         """
 
+        # Define a useful initial guess. Lineshape guesses are only used, if
+        # the value is set to inf. This avoids overwriting user defined values.
+        if (self.epithermal_correction
+            and self.parameters['lineshape_epithermal'].value == np.inf):
+            self.parameters['lineshape_epithermal'].value = lineshape[0]
+
         self.initial_state = copy.deepcopy(self)
 
         if markov_chain is not None:
@@ -778,15 +793,10 @@ class Sample:
         else:
             self.measurement_energies = implantation_energies.copy()
             self.measurement_lineshape = lineshape.copy()
-            self.measurement_lineshape_delta = lineshape_deltas.copy()
+            if lineshape_deltas is not None:
+                self.measurement_lineshape_delta = lineshape_deltas.copy()
 
         # TODO: Sort data by implantation energy
-
-        # Define a useful initial guess. Lineshape guesses are only used, if
-        # the value is set to inf. This avoids overwriting user defined values.
-        if (self.epithermal_correction
-            and self.parameters['lineshape_epithermal'].value == np.inf):
-            self.parameters['lineshape_epithermal'].value = lineshape[0]
 
         index = -1
         stepsize = len(lineshape) // len(self.layers)
@@ -811,7 +821,9 @@ class Sample:
                 self.parameters[p].value = parameters[p].value
 
             diff = (self.model_diffusion(energies) - lineshape)
-            return diff / lineshape_deltas
+            if lineshape_deltas is not None:
+                diff /= lineshape_deltas
+            return diff
 
         # Perform the actual fit
         start_time = time.time()
@@ -840,7 +852,7 @@ class Sample:
                     '\nDiffusion length(s):')
             for layer in self.layers:
                 diffusion_length_err = fit_result.params[f'diffusion_length_{layer.index}'].stderr
-                msg += (f'\n- Layer {layer.index}: '
+                msg += (f'\n- {layer.name}: '
                         f'({np.round(layer.diffusion_length, self.precision)} '
                         f'+/- {np.round(diffusion_length_err, self.precision)}'
                          ') nm')
