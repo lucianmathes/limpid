@@ -30,7 +30,7 @@ pip install --editable .
 Learn how to use LIMPID by following these example applications.
 
 ## Example 1: A Si Monocrystal
-Create a limpid Sample object containing the Si-specific parameters needed [[1]](#1).
+Create a limpid Sample object containing the Si-specific parameters needed[^1].
 ```python
 import limpid
 
@@ -134,6 +134,4 @@ Now retry with an epithermal correction and see, if there are any differences.
 You can find the entire script in `examples/example2_cu-si.py`.
 
 ## References
-<a id="1">[1]</a>
-J. Dryzek, "GEANT4 simulation of slow positron beam implantation profiles",
-Nucl. Instrum. Methods Phys. Res. B, Vol. 266, Number 18, pp4000.
+[^1] J. Dryzek, "GEANT4 simulation of slow positron beam implantation profiles", Nucl. Instrum. Methods Phys. Res. B, Vol. 266, Number 18, pp4000.
