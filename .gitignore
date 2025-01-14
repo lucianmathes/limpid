@@ -1,7 +1,6 @@
 *.pyc
 */*/__pycache__
 *.egg-info*
-examples/*
 build/*
 dist/*
 .coverage

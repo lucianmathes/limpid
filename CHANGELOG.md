@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.2] - 2025-01-09
+### Added
+- Second example with dataset.
+- Dryzek citation for Makhov parameters in the README.
+- Option to fit data without delta/standard deviation.
+- Option to pass a single Layer object to Sample.
+
+### Changed
+- Added missing import to __init__.py.
+- Avoid division inf / inf when calculating diffusion to layer boundaries.
+- Increase max. number of function evaluations to 200.
+- Fix missing initial guess in plots of fits using epithermal correction.
+- Use finely-spaced energy for fraction plots instead of the energy provided by the data.
+
+### Removed
+- Unused data in the examples folder.
+
 ## [0.2.1] - 2025-01-08
 ### Added
 - Script for Example 1 referenced in the README.
