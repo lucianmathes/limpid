@@ -24,7 +24,7 @@ def check_sample_status(sample: limpid.Sample):
     elif sample.fit_status < 1:
         print('The fit terminated before any fitting condition was satisfied.')
 
-def initial_guess(
+def plot_initial_guess(
     sample: Sample,
     energies: np.ndarray|None = None,
     lineshape: np.ndarray|None = None,
@@ -81,7 +81,7 @@ def initial_guess(
 
     return fig, ax
 
-def fit_result(sample: Sample, show_init: bool = True):
+def plot_result(sample: Sample, show_init: bool = True):
     """Shows a plot of the data and fit result.
 
     Args:
@@ -118,7 +118,7 @@ def fit_result(sample: Sample, show_init: bool = True):
 
     return fig, ax
 
-def detailed_fit_result(
+def plot_detailed_result(
     sample: limpid.Sample,
     output_dir: str = '',
     profile_energies: tuple = ('mid', 'high'),

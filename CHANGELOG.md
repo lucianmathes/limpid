@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.3] - 2025-01-28
+### Added
+- Citations regarding the epithermal correction method.
+
+### Changed
+- Layer thickness is now varied by default, if no value is specified.
+- More detailed Sample class docstring.
+- Renamed functions for visualization. All plotting functions now start with `plot_`.
+
+### Removed
+- Unused tests folder.
+
 ## [0.2.2] - 2025-01-09
 ### Added
 - Second example with dataset.
@@ -13,7 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Option to pass a single Layer object to Sample.
 
 ### Changed
-- Added missing import to __init__.py.
+- Added missing import to `__init__.py`.
 - Avoid division inf / inf when calculating diffusion to layer boundaries.
 - Increase max. number of function evaluations to 200.
 - Fix missing initial guess in plots of fits using epithermal correction.
@@ -36,7 +48,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Fix diffusion rates at very low energies by cutting the integration range.
 - Include the initial guess in the result plot by default.
-- All functions of visualize.py and the example_data submodule can now be accessed like top-level functions of limpid.
+- All functions of `visualize.py` and the `example_data` submodule can now be accessed like top-level functions of limpid.
 
 ## [0.1.5] - 2024-12-10
 ### Added
@@ -45,7 +57,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Fix the handling of unsuccessful fits.
-- Move data/ folder into examples/ directory.
+- Move `data/` folder into `examples/` directory.
 - Version is now only defined in __init__.py. Setuptools can read it from there.
 - Fix a bug in the calculation of diffusion rates/fractions that would result in negative concentrations.
 

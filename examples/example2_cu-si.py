@@ -12,10 +12,13 @@ sample.parameters["lineshape_2"].value = 0.65
 sample.parameters["diffusion_length_1"].value = 30
 sample.parameters["diffusion_length_2"].value = 165
 sample.parameters["diffusion_length_2"].vary = False
-sample.parameters["thickness_1"].value = 350
-sample.parameters["thickness_1"].vary = True
+#sample.parameters["thickness_1"].value = 350
+#sample.parameters["thickness_1"].vary = True
+
+sample.parameters.pretty_print()
+quit()
 
 sample.fit(e, s, ds, verbose=True)
-limpid.fit_result(sample, show_init=True)
+limpid.plot_result(sample, show_init=True)
 
 sample.parameters.pretty_print()

@@ -50,13 +50,13 @@ Note that `s` here is normalized to its last value (S<sub>bulk</sub> = 1).
 sample.parameters["lineshape_0"].value = 0.96
 sample.parameters["lineshape_1"].value = 1
 
-limpid.initial_guess(sample, e, s)
+limpid.plot_initial_guess(sample, e, s)
 ```
 
 Perform the fit and plot the result.
 ```python
 sample.fit(e, s)
-limpid.fit_result(sample)
+limpid.plot_result(sample)
 ```
 
 Let's print the resulting diffusion length of positrons in Si.
@@ -81,7 +81,7 @@ sample.fit(e, s, verbose=True)
 Plot the result (including initial guess).
 And also plot the implantation and annihilation fractions where you can see the percentage of epithermal positrons.
 ```python
-limpid.fit_result(sample, show_init=True)
+limpid.plot_result(sample, show_init=True)
 limpid.plot_fractions(sample)
 ```
 
@@ -122,7 +122,7 @@ sample.parameters["thickness_1"].vary = True
 Perform the fit and plot the result.
 ```python
 sample.fit(e, s, ds, verbose=True)
-limpid.fit_result(sample, show_init=True)
+limpid.plot_result(sample, show_init=True)
 ```
 
 Print a table of all parameters.
