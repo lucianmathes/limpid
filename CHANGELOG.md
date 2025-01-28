@@ -58,7 +58,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Fix the handling of unsuccessful fits.
 - Move `data/` folder into `examples/` directory.
-- Version is now only defined in __init__.py. Setuptools can read it from there.
+- Version is now only defined in `__init__.py`. Setuptools can read it from there.
 - Fix a bug in the calculation of diffusion rates/fractions that would result in negative concentrations.
 
 ### Removed
@@ -70,13 +70,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Continuous integration on GitLab.
 - README section on using the C library.
 - A unittest that actually tests nothing.
-- Include version number in __init__.py
+- Include version number in `__init__.py`.
 - Gitignore file.
 - Usage example including data of a Cu layer on Si.
 
 ### Changed
 - Move testing scripts to separate folder.
-- Fix a bug with pkg_resources.
+- Fix a bug with `pkg_resources`.
 
 ## [0.1.0] - 2022-06-08
 ### Added
