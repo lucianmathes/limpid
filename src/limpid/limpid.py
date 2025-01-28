@@ -858,7 +858,8 @@ class Sample:
             self.fit_status = -1
 
         if self.fit_status <= 0:
-            msg = ('Fit did not succeed.')
+            wrn = ('Fit did not succeed.')
+            print(wrn)
         else:
             msg = (f'\nFit duration: {fit_duration} s'
                     '\nDiffusion length(s):')
@@ -868,8 +869,8 @@ class Sample:
                         f'({np.round(layer.diffusion_length, self.precision)} '
                         f'+/- {np.round(diffusion_length_err, self.precision)}'
                          ') nm')
-        if verbose >= 1:
-            print(msg)
+            if verbose >= 1:
+                print(msg)
         if report_to:
             with open(report_to, 'w') as f:
                 f.write(msg)

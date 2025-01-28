@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.2.3] - 2025-01-28
 ### Added
 - Citations regarding the epithermal correction method.
+- A warning is now printed even in non-verbose mode, if the fit did not succeed.
 
 ### Changed
 - Layer thickness is now varied by default, if no value is specified.
