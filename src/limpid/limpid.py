@@ -198,8 +198,7 @@ class Layer:
                              previously_implanted[i], energy,
                              *self.implantation_profile.parameters)
             max_depth = self.implantation_profile.get_depth(
-                             1 - 1e-15, energy,
-                             *self.implantation_profile.parameters)
+                             1, energy, *self.implantation_profile.parameters)
             offsets[i] = offset
             c_left[i] = integral(lambda z: self.implantation_profile(z + offset, energy) *
                     concentration_left(z, self.thickness, 1/self.diffusion_length), max_depth)
