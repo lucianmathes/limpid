@@ -347,14 +347,22 @@ class Sample:
           name: Defines the name of the sample.
           implantation_model: Defines the model used for positron
             implantation.
-          epithermal_correction: If True a correction for epithermal
-            positrons is applied.
+          epithermal_correction: If True a correction for epithermal positrons
+            is applied. The simple correction used here was suggested by
+            [Britton]_ and is also used by VEPFIT [Veen]_.
           temperature: Defines the sample temperature in K.
           precision: Defines the decimals used for computation, i.e., error
             tolerance of the implantation profile integral and fit tolerance.
             Default is 8, resulting in a tolerance of 10^(-8).
           markov_chain: If True a markov chain approach is used to simulate
             positron diffusion.
+
+        References:
+          .. [Britton] D.T. Britton, "Epithermal effects in positron depth
+                       profiling measurements", Phil. Mag. Lett., Vol. 57,
+                       Number 3, pp165-169, 1988.
+          .. [Veen] A. van Veen, "Analysis of positron profiling data by means
+                    of 'VEPFIT'", AIP Conf. Proc., Vol. 218, pp171-198, 1991.
         """
 
         if type(layers) == Layer:
