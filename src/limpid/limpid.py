@@ -310,11 +310,12 @@ class Sample:
     contains all information necessary for the simulations.
 
     Attributes:
-      layers: A list of Layer objects representing the sample.
+      layers: A list of Layer objects representing the sample. Ordered from
+        surface to bulk.
       surface: A Surface object at the top of the sample.
       name: A string containing the name of the sample.
       implantation_model: A string containing the model used for
-        positron implantation.
+        positron implantation. Currently only 'makhov' is supported.
       epithermal_correction: A boolean indicating if a correction for
         epithermal positrons is applied.
       temperature: A float containing the sample temperature in K.
@@ -340,7 +341,9 @@ class Sample:
 
         Args:
           layers: A single Layer object or list of Layer objects representing
-            the sample.
+            the sample. Ordered from surface to bulk. Do not provide a layer
+            representing the surface, the surface is added at index 0 by the
+            algorithm.
           name: Defines the name of the sample.
           implantation_model: Defines the model used for positron
             implantation.
@@ -436,7 +439,9 @@ class Sample:
                 layer.thickness = np.inf
             else:
                 if layer.thickness == np.inf:
-                    layer.thickness = 200 # set a default starting value
+                    # set a default starting value
+                    self.parameters[f'thickness_{i}'].value = 200
+                    self.parameters[f'thickness_{i}'].vary = True
 
         if self.epithermal_correction:
             # Due to the nature of the epithermal correction, we set the lower
