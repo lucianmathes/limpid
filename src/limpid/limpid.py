@@ -441,7 +441,7 @@ class Sample:
                 # last layer defaults to infinite thickness
                 if layer.thickness != np.inf:
                     wrn = (f'Invalid thickness ({layer.thickness}) for the '
-                           f'last layer (#{layer.index}). Thickness set to '
+                           f'last layer ({layer.name}). Thickness set to '
                             'inf.')
                     print(wrn)
                 layer.thickness = np.inf
@@ -789,6 +789,14 @@ class Sample:
         if (self.epithermal_correction
             and self.parameters['lineshape_epithermal'].value == np.inf):
             self.parameters['lineshape_epithermal'].value = lineshape[0]
+
+        last_layer = self.layers[-1]
+        if not np.isinf(last_layer.thickness):
+            wrn = (f'Invalid thickness ({last_layer.thickness}) for the '
+                   f'last layer ({last_layer.name}). Thickness set to '
+                    'inf.')
+            print(wrn)
+            last_layer.thickness = np.inf
 
         self.initial_state = copy.deepcopy(self)
 
