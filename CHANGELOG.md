@@ -17,9 +17,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix epithermal fractions at very low energies by cutting the integration range.
 - Parameters object now contains Stderr values after fitting.
 
-### Removed
-- Unused tests folder.
-
 ## [0.2.2] - 2025-01-09
 ### Added
 - Second example with dataset.
