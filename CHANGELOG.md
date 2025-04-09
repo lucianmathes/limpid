@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.2.3] - 2025-01-28
+## [0.3.0] - 2025-04-09
 ### Added
 - Citations regarding the epithermal correction method.
 - A warning is now printed even in non-verbose mode, if the fit did not succeed.
@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Layer thickness is now varied by default, if no value is specified.
 - More detailed Sample class docstring.
 - Renamed functions for visualization. All plotting functions now start with `plot_`.
+- Fix epithermal fractions at very low energies by cutting the integration range.
+- Parameters object now contains Stderr values after fitting.
 
 ### Removed
 - Unused tests folder.
