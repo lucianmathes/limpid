@@ -731,7 +731,10 @@ class Sample:
                     func = (lambda z: layer.implantation_profile(z+offsets[i, j], e)
                             * np.exp(-(z+offsets[i, j])
                             / self.parameters["diffusion_length_epithermal"].value))
-                    epi_frac[i] += integrate.quad(func, 0, layer.thickness)[0]
+                    max_depth = layer.implantation_profile.get_depth(
+                                  1, e, *layer.implantation_profile.parameters)
+                    epi_frac[i] += integrate.quad(func, 0,
+                                            min(layer.thickness, max_depth))[0]
 
             if self.used_markov_to_fit:
                 markov_vector_old = self.markov_vector.copy()
@@ -857,6 +860,9 @@ class Sample:
                                         gtol=precision_exp)
 
         fit_duration = np.round(time.time() - start_time, 5)
+
+        # update parameters object
+        self.parameters = fit_result.params
 
         try:
             self.fit_status = fit_result.status
