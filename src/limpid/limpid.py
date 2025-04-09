@@ -198,8 +198,7 @@ class Layer:
                              previously_implanted[i], energy,
                              *self.implantation_profile.parameters)
             max_depth = self.implantation_profile.get_depth(
-                             1 - 1e-15, energy,
-                             *self.implantation_profile.parameters)
+                             1, energy, *self.implantation_profile.parameters)
             offsets[i] = offset
             c_left[i] = integral(lambda z: self.implantation_profile(z + offset, energy) *
                     concentration_left(z, self.thickness, 1/self.diffusion_length), max_depth)
@@ -311,11 +310,12 @@ class Sample:
     contains all information necessary for the simulations.
 
     Attributes:
-      layers: A list of Layer objects representing the sample.
+      layers: A list of Layer objects representing the sample. Ordered from
+        surface to bulk.
       surface: A Surface object at the top of the sample.
       name: A string containing the name of the sample.
       implantation_model: A string containing the model used for
-        positron implantation.
+        positron implantation. Currently only 'makhov' is supported.
       epithermal_correction: A boolean indicating if a correction for
         epithermal positrons is applied.
       temperature: A float containing the sample temperature in K.
@@ -341,18 +341,28 @@ class Sample:
 
         Args:
           layers: A single Layer object or list of Layer objects representing
-            the sample.
+            the sample. Ordered from surface to bulk. Do not provide a layer
+            representing the surface, the surface is added at index 0 by the
+            algorithm.
           name: Defines the name of the sample.
           implantation_model: Defines the model used for positron
             implantation.
-          epithermal_correction: If True a correction for epithermal
-            positrons is applied.
+          epithermal_correction: If True a correction for epithermal positrons
+            is applied. The simple correction used here was suggested by
+            [Britton]_ and is also used by VEPFIT [Veen]_.
           temperature: Defines the sample temperature in K.
           precision: Defines the decimals used for computation, i.e., error
             tolerance of the implantation profile integral and fit tolerance.
             Default is 8, resulting in a tolerance of 10^(-8).
           markov_chain: If True a markov chain approach is used to simulate
             positron diffusion.
+
+        References:
+          .. [Britton] D.T. Britton, "Epithermal effects in positron depth
+                       profiling measurements", Phil. Mag. Lett., Vol. 57,
+                       Number 3, pp165-169, 1988.
+          .. [Veen] A. van Veen, "Analysis of positron profiling data by means
+                    of 'VEPFIT'", AIP Conf. Proc., Vol. 218, pp171-198, 1991.
         """
 
         if type(layers) == Layer:
@@ -431,13 +441,15 @@ class Sample:
                 # last layer defaults to infinite thickness
                 if layer.thickness != np.inf:
                     wrn = (f'Invalid thickness ({layer.thickness}) for the '
-                           f'last layer (#{layer.index}). Thickness set to '
+                           f'last layer ({layer.name}). Thickness set to '
                             'inf.')
                     print(wrn)
                 layer.thickness = np.inf
             else:
                 if layer.thickness == np.inf:
-                    layer.thickness = 200 # set a default starting value
+                    # set a default starting value
+                    self.parameters[f'thickness_{i}'].value = 200
+                    self.parameters[f'thickness_{i}'].vary = True
 
         if self.epithermal_correction:
             # Due to the nature of the epithermal correction, we set the lower
@@ -719,7 +731,10 @@ class Sample:
                     func = (lambda z: layer.implantation_profile(z+offsets[i, j], e)
                             * np.exp(-(z+offsets[i, j])
                             / self.parameters["diffusion_length_epithermal"].value))
-                    epi_frac[i] += integrate.quad(func, 0, layer.thickness)[0]
+                    max_depth = layer.implantation_profile.get_depth(
+                                  1, e, *layer.implantation_profile.parameters)
+                    epi_frac[i] += integrate.quad(func, 0,
+                                            min(layer.thickness, max_depth))[0]
 
             if self.used_markov_to_fit:
                 markov_vector_old = self.markov_vector.copy()
@@ -777,6 +792,14 @@ class Sample:
         if (self.epithermal_correction
             and self.parameters['lineshape_epithermal'].value == np.inf):
             self.parameters['lineshape_epithermal'].value = lineshape[0]
+
+        last_layer = self.layers[-1]
+        if not np.isinf(last_layer.thickness):
+            wrn = (f'Invalid thickness ({last_layer.thickness}) for the '
+                   f'last layer ({last_layer.name}). Thickness set to '
+                    'inf.')
+            print(wrn)
+            last_layer.thickness = np.inf
 
         self.initial_state = copy.deepcopy(self)
 
@@ -838,6 +861,9 @@ class Sample:
 
         fit_duration = np.round(time.time() - start_time, 5)
 
+        # update parameters object
+        self.parameters = fit_result.params
+
         try:
             self.fit_status = fit_result.status
         except AttributeError:
@@ -846,7 +872,8 @@ class Sample:
             self.fit_status = -1
 
         if self.fit_status <= 0:
-            msg = ('Fit did not succeed.')
+            wrn = ('Fit did not succeed.')
+            print(wrn)
         else:
             msg = (f'\nFit duration: {fit_duration} s'
                     '\nDiffusion length(s):')
@@ -856,8 +883,8 @@ class Sample:
                         f'({np.round(layer.diffusion_length, self.precision)} '
                         f'+/- {np.round(diffusion_length_err, self.precision)}'
                          ') nm')
-        if verbose >= 1:
-            print(msg)
+            if verbose >= 1:
+                print(msg)
         if report_to:
             with open(report_to, 'w') as f:
                 f.write(msg)

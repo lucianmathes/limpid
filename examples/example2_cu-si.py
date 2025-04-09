@@ -16,6 +16,6 @@ sample.parameters["thickness_1"].value = 350
 sample.parameters["thickness_1"].vary = True
 
 sample.fit(e, s, ds, verbose=True)
-limpid.fit_result(sample, show_init=True)
+limpid.plot_result(sample, show_init=True)
 
 sample.parameters.pretty_print()

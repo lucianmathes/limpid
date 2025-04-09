@@ -76,7 +76,7 @@ class MakhovProfile(ImplantationProfile):
         z_avg = a / rho * energy ** n * 10
         z_0 = z_avg / math.gamma(1 / m + 1)
 
-        # deals with infinite offsets, the error made by this implementation is negligible
+        # computer precision
         if implanted > 1 - 1E-15:
             implanted = 1 - 1E-15
 
