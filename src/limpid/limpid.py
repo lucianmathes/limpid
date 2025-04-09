@@ -885,8 +885,8 @@ class Sample:
                          ') nm')
             if verbose >= 1:
                 print(msg)
-        if report_to:
-            with open(report_to, 'w') as f:
-                f.write(msg)
+            if report_to:
+                with open(report_to, 'w') as f:
+                    f.write(msg)
 
         return fit_result
