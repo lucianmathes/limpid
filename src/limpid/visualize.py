@@ -37,13 +37,13 @@ def plot_initial_guess(
 
     Args:
       sample: The Sample object containing all the data.
-      energies: Positron implantation energies of the measurement data.
+      energies: Positron implantation energies of the measurement data in keV.
       lineshape: Measured lineshape parameters.
       lineshape_delta: Errors of the measured lineshape parameters.
       n_energies: Number of samples between min and max energy, if no data
         provided.
-      e_min: Min energy, if no data provided.
-      e_max: Max energy, if no data provided.
+      e_min: Min energy in keV, if no data provided.
+      e_max: Max energy in keV, if no data provided.
 
     Returns:
       A tuple of the matplotlib Figure and Axis objects.
@@ -133,8 +133,9 @@ def plot_detailed_result(
     Args:
       sample: The Sample object containing all the data.
       output_dir: The directory to save the figure in.
-      profile_energies: A tuple of two selected implantation energies. The
-        figure will contain the corresponding implantation profiles.
+      profile_energies: A tuple of two selected implantation energies in keV.
+        The figure will contain the corresponding implantation profiles. Other
+        possible values (for auto-selection): 'mid', 'high'.
       show: Show a popup window containing the plot.
 
     Returns:

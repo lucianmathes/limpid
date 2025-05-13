@@ -146,7 +146,7 @@ class Layer:
 
         Args:
           implantation_energies: Numpy array containing all positron
-            implantation energies.
+            implantation energies in keV.
           previously_implanted: Numpy array containing the fraction of
             positrons implanted before this layer.
 
@@ -468,13 +468,13 @@ class Sample:
     ) -> tuple[np.ndarray, np.ndarray]:
         """Evaluates the combined implantation profile.
 
-        Calculates the combined implantation profile for a given sample at a given
-        energy. The maximum implantation depth is automatically calculated
-        (cut-off @ 99.9%).
+        Calculates the combined implantation profile for a given sample at a
+        given energy. The maximum implantation depth is automatically
+        calculated (cut-off @ 99.9%).
 
         Args:
-          implantation_energy: The positron implantation energy for which the
-            implantation profile is calculated.
+          implantation_energy: The positron implantation energy in keV for
+            which the implantation profile is calculated.
           num_depth: The number of depths evaluated.
 
         Returns:
@@ -538,7 +538,7 @@ class Sample:
 
         Args:
           implantation_energies: Simulate positron diffusion for the
-            implantation energies provided.
+            implantation energies provided. Energies in keV.
           markov_chain: If True a markov chain approach is used to simulate
             positron diffusion. If None use value defined in __init__().
 
@@ -766,8 +766,8 @@ class Sample:
         lineshape data provided to a lmfit.Minimizer() instance.
 
         Args:
-          implantation_energies: A list of positron implantation energies from
-            your data.
+          implantation_energies: A list of positron implantation energies in
+            keV, from your data.
           lineshape: A list of measured data, e.g., S or W parameter.
           lineshape_delta: A list of errorbars for the lineshape data.
           report_to: A string containing the desired output filepath. Caution:
