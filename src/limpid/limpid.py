@@ -497,17 +497,19 @@ class Sample:
             offsets.append(offset)
 
             max_layer_depth = layer.implantation_profile.get_depth(
-                                  0.999, implantation_energy,
+                                  1, implantation_energy,
                                   *layer.implantation_profile.parameters)
 
             if max_layer_depth < layer.thickness + offset:
-                max_depth = max_layer_depth - offset
-                implanted.append(0.999 - implanted[-1])
-
+                # all remaining positrons are implanted into current layer
+                max_depth = (np.sum([l.thickness for l in self.layers[:i]])
+                             + max_layer_depth - offset)
+                implanted.append(1 - np.sum(implanted))
+                break
             else:
                 implanted.append(integrate.quad(
                     lambda z: layer.implantation_profile(z + offset, implantation_energy),
-                    0, layer.thickness, epsabs=1e-5, epsrel=1e-5)[0] - implanted[-1])
+                    0, layer.thickness, epsabs=1e-5, epsrel=1e-5)[0] - np.sum(implanted))
 
         def combined_implantation_profile(z):
 
