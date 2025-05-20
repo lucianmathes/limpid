@@ -483,7 +483,7 @@ class Sample:
         """
 
         max_depth = np.inf
-        implanted = [0]
+        implanted = []
         offsets = []
 
         for i, layer in enumerate(self.layers):
@@ -507,25 +507,24 @@ class Sample:
                 implanted.append(1 - np.sum(implanted))
                 break
             else:
+                prec_exp = 10 ** (-self.precision)
                 implanted.append(integrate.quad(
                     lambda z: layer.implantation_profile(z + offset, implantation_energy),
-                    0, layer.thickness, epsabs=1e-5, epsrel=1e-5)[0] - np.sum(implanted))
+                    0, min(max_depth, layer.thickness), epsabs=prec_exp, epsrel=prec_exp)[0])
 
-        def combined_implantation_profile(z):
+        zlist = np.linspace(0, max_depth, num_depth)
+        plist = []
+        for z in zlist:
+            for i in range(len(self.layers)):
+                z_is_in_current_layer = (z >= np.sum([l.thickness for l in self.layers[:i]]))
+                if i < len(self.layers):
+                    z_is_in_current_layer &= (z < np.sum([l.thickness for l in self.layers[:i+1]]))
+                
+                if z_is_in_current_layer:
+                    zz = z + offsets[i] - np.sum([l.thickness for l in self.layers[:i]])
+                    plist.append(self.layers[i].implantation_profile(zz, implantation_energy))
 
-            lower_bound = 0
-            total_depth = 0
-
-            for offset, layer in zip(offsets, self.layers):
-                total_depth += layer.thickness
-                if lower_bound <= z <= total_depth:
-                    return layer.implantation_profile(z + offset, implantation_energy)
-                else:
-                    lower_bound = total_depth
-
-        z = np.linspace(0, max_depth, num_depth)
-
-        return z, [combined_implantation_profile(z_val) for z_val in z]
+        return zlist, plist
 
     def model_diffusion(self,
                         implantation_energies: tuple[float, ...],
