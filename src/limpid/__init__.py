@@ -5,4 +5,4 @@ from .visualize import (
 )
 from .example_data import load_example_data, list_example_data
 
-__version__ = "0.3.0"
+__version__ = "0.3.1"
