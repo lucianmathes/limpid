@@ -146,7 +146,7 @@ class Layer:
 
         Args:
           implantation_energies: Numpy array containing all positron
-            implantation energies.
+            implantation energies in keV.
           previously_implanted: Numpy array containing the fraction of
             positrons implanted before this layer.
 
@@ -468,13 +468,13 @@ class Sample:
     ) -> tuple[np.ndarray, np.ndarray]:
         """Evaluates the combined implantation profile.
 
-        Calculates the combined implantation profile for a given sample at a given
-        energy. The maximum implantation depth is automatically calculated
-        (cut-off @ 99.9%).
+        Calculates the combined implantation profile for a given sample at a
+        given energy. The maximum implantation depth is automatically
+        calculated (cut-off @ 99.9%).
 
         Args:
-          implantation_energy: The positron implantation energy for which the
-            implantation profile is calculated.
+          implantation_energy: The positron implantation energy in keV for
+            which the implantation profile is calculated.
           num_depth: The number of depths evaluated.
 
         Returns:
@@ -483,7 +483,7 @@ class Sample:
         """
 
         max_depth = np.inf
-        implanted = [0]
+        implanted = []
         offsets = []
 
         for i, layer in enumerate(self.layers):
@@ -497,33 +497,34 @@ class Sample:
             offsets.append(offset)
 
             max_layer_depth = layer.implantation_profile.get_depth(
-                                  0.999, implantation_energy,
+                                  1, implantation_energy,
                                   *layer.implantation_profile.parameters)
 
             if max_layer_depth < layer.thickness + offset:
-                max_depth = max_layer_depth - offset
-                implanted.append(0.999 - implanted[-1])
-
+                # all remaining positrons are implanted into current layer
+                max_depth = (np.sum([l.thickness for l in self.layers[:i]])
+                             + max_layer_depth - offset)
+                implanted.append(1 - np.sum(implanted))
+                break
             else:
+                prec_exp = 10 ** (-self.precision)
                 implanted.append(integrate.quad(
                     lambda z: layer.implantation_profile(z + offset, implantation_energy),
-                    0, layer.thickness, epsabs=1e-5, epsrel=1e-5)[0] - implanted[-1])
+                    0, min(max_depth, layer.thickness), epsabs=prec_exp, epsrel=prec_exp)[0])
 
-        def combined_implantation_profile(z):
+        zlist = np.linspace(0, max_depth, num_depth)
+        plist = []
+        for z in zlist:
+            for i in range(len(self.layers)):
+                z_is_in_current_layer = (z >= np.sum([l.thickness for l in self.layers[:i]]))
+                if i < len(self.layers):
+                    z_is_in_current_layer &= (z < np.sum([l.thickness for l in self.layers[:i+1]]))
+                
+                if z_is_in_current_layer:
+                    zz = z + offsets[i] - np.sum([l.thickness for l in self.layers[:i]])
+                    plist.append(self.layers[i].implantation_profile(zz, implantation_energy))
 
-            lower_bound = 0
-            total_depth = 0
-
-            for offset, layer in zip(offsets, self.layers):
-                total_depth += layer.thickness
-                if lower_bound <= z <= total_depth:
-                    return layer.implantation_profile(z + offset, implantation_energy)
-                else:
-                    lower_bound = total_depth
-
-        z = np.linspace(0, max_depth, num_depth)
-
-        return z, [combined_implantation_profile(z_val) for z_val in z]
+        return zlist, plist
 
     def model_diffusion(self,
                         implantation_energies: tuple[float, ...],
@@ -538,7 +539,7 @@ class Sample:
 
         Args:
           implantation_energies: Simulate positron diffusion for the
-            implantation energies provided.
+            implantation energies provided. Energies in keV.
           markov_chain: If True a markov chain approach is used to simulate
             positron diffusion. If None use value defined in __init__().
 
@@ -766,8 +767,8 @@ class Sample:
         lineshape data provided to a lmfit.Minimizer() instance.
 
         Args:
-          implantation_energies: A list of positron implantation energies from
-            your data.
+          implantation_energies: A list of positron implantation energies in
+            keV, from your data.
           lineshape: A list of measured data, e.g., S or W parameter.
           lineshape_delta: A list of errorbars for the lineshape data.
           report_to: A string containing the desired output filepath. Caution:
@@ -885,8 +886,8 @@ class Sample:
                          ') nm')
             if verbose >= 1:
                 print(msg)
-        if report_to:
-            with open(report_to, 'w') as f:
-                f.write(msg)
+            if report_to:
+                with open(report_to, 'w') as f:
+                    f.write(msg)
 
         return fit_result
