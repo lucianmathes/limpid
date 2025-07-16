@@ -74,19 +74,20 @@ def plot_initial_guess(
     ax.plot(energies, sample.initial_state.model_diffusion(energies),
             label='initial guess')
     ax.legend()
-    ax.set_xlabel('Energy / keV')
-    ax.set_ylabel('Lineshape')
+    ax.set_xlabel('Positron implantation energy / keV')
+    ax.set_ylabel('Lineshape parameter')
     fig.suptitle(sample.name)
     plt.show()
 
     return fig, ax
 
-def plot_result(sample: Sample, show_init: bool = True):
+def plot_result(sample: Sample, show_init: bool = True, show: bool = True):
     """Shows a plot of the data and fit result.
 
     Args:
       sample: The Sample object containing all the data.
       show_init: Show the initial guess.
+      show: Show the matplotlib pop-up window.
 
     Returns:
       A tuple of the matplotlib Figure and Axis objects.
@@ -111,10 +112,11 @@ def plot_result(sample: Sample, show_init: bool = True):
                 label='initial guess')
     ax.plot(energies, sample.model_diffusion(energies), label='fit')
     ax.legend()
-    ax.set_xlabel('Energy / keV')
-    ax.set_ylabel('Lineshape')
+    ax.set_xlabel('Positron implantation energy / keV')
+    ax.set_ylabel('Lineshape parameter')
     fig.suptitle(sample.name)
-    plt.show()
+    if show:
+        plt.show()
 
     return fig, ax
 
