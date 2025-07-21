@@ -99,6 +99,12 @@ class Layer:
         self.parameters.add(f'diffusion_coefficient_{self.index}',
                             value=diffusion_coefficient, vary=False, min=1E-15)
 
+        if positron_affinity > 0:
+            wrn = ('The positron affinity must be negative. Using default '
+                   'value of -1.')
+            print(wrn)
+            positron_affinity = -1
+
         self.positron_affinity = positron_affinity
         self.temperature = 293
 
