@@ -237,7 +237,7 @@ def plot_fractions(
       A tuple of the matplotlib Figure and Axes objects.
     """
 
-    if type(sample.markov_vector) == bool:
+    if sample.annihilation_fractions is None:
         err = ('Cannot create plot of implanted and annihilated fractions '
                'without modelling diffusion. Call Sample.fit() or '
                'Sample.model_diffusion() first.')
@@ -247,7 +247,7 @@ def plot_fractions(
     energies = np.linspace(sample.measurement_energies[0],
                            sample.measurement_energies[-1], 120)
     sample.model_diffusion(energies)
-    annihilation_fractions = sample.markov_vector.transpose()
+    annihilation_fractions = sample.annihilation_fractions
     annihilation_channels = ['surface', *[l.name for l in sample.layers]]
 
     if sample.epithermal_correction:
@@ -279,10 +279,10 @@ def plot_fractions(
         # annihilation fractions
         cumsum_annihilation = np.zeros_like(sample.implantation_fractions[0])
         for i, channel_name in enumerate(annihilation_channels):
-            cumsum_annihilation += annihilation_fractions[i]
+            cumsum_annihilation += annihilation_fractions.T[i]
             axs[1].plot(energies, cumsum_annihilation, color='black')
             axs[1].fill_between(x=energies,
-                    y1=cumsum_annihilation-annihilation_fractions[i],
+                    y1=cumsum_annihilation-annihilation_fractions.T[i],
                     y2=cumsum_annihilation, color=colors[i], label=channel_name)
         axs[0].xaxis.set_ticks_position('top')
         axs[0].set_ylim(0, 1.01)
