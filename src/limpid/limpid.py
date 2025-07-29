@@ -171,20 +171,19 @@ class Layer:
 
         @cache
         def concentration_left(z, thickness, u):
-            numerator = np.exp(-u * z) - np.exp(u * (z - 2 * thickness))
-            denominator = 1 - np.exp(-2 * u * thickness)
-            return numerator / denominator
+            if np.isinf(thickness):
+                c_left = np.exp(-u * z)
+            else:
+                c_left = np.sinh(u * (thickness - z)) / np.sinh(u * thickness)
+            return c_left
 
         @cache
         def concentration_right(z, thickness, u):
-            denominator = (np.exp(u * thickness) - np.exp(- u * thickness))
-            if np.isinf(denominator):
-                # Avoid division inf / inf.
-                conc = 0
+            if np.isinf(thickness):
+                c_right = 0
             else:
-                numerator = np.exp(u * z) - np.exp(- u * z)
-                conc = numerator / denominator
-            return conc
+                c_right = np.sinh(u * z) / np.sinh(u * thickness)
+            return c_right
 
         def integral(f, max_depth):
             return integrate.quad(f, 0, min(max_depth, self.thickness),
