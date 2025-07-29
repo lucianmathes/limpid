@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Use analytically correct matrix description of the Markov process.
+- Use hyperbolic functions in first diffusion step to avoid numerical cancellation.
 
 ### Removed
 - Legacy algorithm.
