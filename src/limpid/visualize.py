@@ -293,7 +293,7 @@ def plot_fractions(
             axs[0].plot(energies, sample.implantation_fractions[i], linestyle='-',
                         marker='', color=colors[i+skip_colors])
         for i, channel_name in enumerate(annihilation_channels):
-            axs[1].plot(energies, annihilation_fractions[i], color=colors[i], label=channel_name)
+            axs[1].plot(energies, annihilation_fractions.T[i], color=colors[i], label=channel_name)
         axs[0].set_ylim(-0.01, 1.01)
         axs[1].set_ylim(-0.01, 1.01)
 
