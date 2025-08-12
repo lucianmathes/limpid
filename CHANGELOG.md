@@ -8,10 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.4.0] - 2025-07-21
 ### Added
 - Warning if positive positron affinities are provided.
+- Colors option for `plot_fractions`.
 
 ### Changed
 - Use analytically correct matrix description of the Markov process.
 - Use hyperbolic functions in first diffusion step to avoid numerical cancellation.
+- Fix bug where data was missing in `plot_initial_guess`.
 
 ### Removed
 - Legacy algorithm.

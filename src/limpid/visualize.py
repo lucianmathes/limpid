@@ -56,11 +56,15 @@ def plot_initial_guess(
 
     fig, ax = plt.subplots()
 
-    if energies is not None:
+    if energies is not None and lineshape_delta is not None:
         e_min = energies[0]
         e_max = energies[-1]
-        ax.errorbar(energies, lineshape ,lineshape_delta, ls='', capsize=3,
+        ax.errorbar(energies, lineshape, lineshape_delta, ls='', capsize=3,
                     label="data")
+    elif lineshape_delta is None:
+        ax.scatter(energies, lineshape, label="data")
+        # manually step forward in the color cycle, because scatter doesn't
+        ax.plot([])
     elif sample.measurement_energies is not None:
         e_min = sample.measurement_energies[0]
         e_max = sample.measurement_energies[-1]
@@ -216,6 +220,7 @@ def plot_detailed_result(
 def plot_fractions(
     sample: limpid.Sample,
     cumulative: bool = True,
+    colors: list[str]|None = None,
     save: bool = True,
     show: bool = True,
     savename: str = 'positron_fractions.pdf',
@@ -228,8 +233,10 @@ def plot_fractions(
 
     Args:
       sample: The Sample object containing all the data.
-      show: Show a popup window containing the plot.
+      cumulative: Choose between cumulative and normal plotting.
+      colors: List of colors recognized by matplotlib.
       save: Save the figure to a file.
+      show: Show a popup window containing the plot.
       savename : Filepath to save the figure at.
       fig: matplotlib.pyplot.Figure instance used for plotting.
 
@@ -256,7 +263,8 @@ def plot_fractions(
     else:
         skip_colors = 1
 
-    colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+    if colors is None:
+        colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
     while len(colors) < len(annihilation_channels):
         colors += colors
 
