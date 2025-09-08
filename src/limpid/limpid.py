@@ -244,19 +244,19 @@ class Layer:
 
         elif exponential >= 30:
             # exp(-30) ~ 10^-15 -> truncated, since negligible
-            diffusion = 2 * u * diffusion_coeff * np.exp(-u * thickness)
+            diffusion = 2 * np.exp(- exponential)
 
         else:
-            diffusion = 2 * u * diffusion_coeff * 1 / (np.exp(-u * thickness) * np.expm1(2 * u * thickness))
+            diffusion = 2 / (np.exp(- exponential) * np.expm1(2 * exponential))
 
         # annihilation
         if exponential >= 30:
             # exp(-30) ~ 10^-15 -> truncated, since negligible
-            annihilation = u * diffusion_coeff
+            annihilation = 1
 
         else:
-            annihilation = u * diffusion_coeff * (np.exp(u * thickness) + np.exp(-u * thickness) - 2) / \
-                           (np.exp(-u * thickness) * np.expm1(2 * u * thickness))
+            annihilation = (np.exp(exponential) + np.exp(- exponential) - 2) / \
+                           (np.exp(- exponential) * np.expm1(2 * exponential))
 
         return diffusion * boltzmann_factor, annihilation * boltzmann_factor
 
