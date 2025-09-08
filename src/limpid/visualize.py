@@ -278,8 +278,9 @@ def plot_fractions(
         cumsum_implantation = np.zeros_like(sample.implantation_fractions[0])
         for i, layer in enumerate(sample.layers):
             cumsum_implantation += sample.implantation_fractions[i]
-            axs[0].plot(energies, cumsum_implantation, linestyle='-',
-                        marker='', color='black')
+            if i < len(annihilation_channels) - 1:
+                axs[0].plot(energies, cumsum_implantation, color='black',
+                            linewidth=1)
             axs[0].fill_between(x=energies,
                         y1=cumsum_implantation-sample.implantation_fractions[i],
                         y2=cumsum_implantation, color=colors[i+skip_colors])
@@ -288,13 +289,15 @@ def plot_fractions(
         cumsum_annihilation = np.zeros_like(sample.implantation_fractions[0])
         for i, channel_name in enumerate(annihilation_channels):
             cumsum_annihilation += annihilation_fractions.T[i]
-            axs[1].plot(energies, cumsum_annihilation, color='black')
+            if i < len(annihilation_channels) - 1:
+                axs[1].plot(energies, cumsum_annihilation, color='black',
+                            linewidth=1)
             axs[1].fill_between(x=energies,
                     y1=cumsum_annihilation-annihilation_fractions.T[i],
                     y2=cumsum_annihilation, color=colors[i], label=channel_name)
         axs[0].xaxis.set_ticks_position('top')
-        axs[0].set_ylim(0, 1.01)
-        axs[1].set_ylim(1.01, 0)
+        axs[0].set_ylim(0, 1)
+        axs[1].set_ylim(1, 0)
         fig.subplots_adjust(hspace=.0)
     else:
         for i, layer in enumerate(sample.layers):
