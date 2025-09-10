@@ -681,7 +681,8 @@ class Sample:
             ls_model = (ls_model * (1 - epi_frac)
                         + self.parameters["lineshape_epithermal"].value
                         * epi_frac)
-            self.annihilation_fractions = np.c_[epi_frac, result]
+            self.annihilation_fractions = np.c_[epi_frac,
+                                            result * (1 - epi_frac[:, None])]
 
         return ls_model
 
