@@ -605,25 +605,6 @@ class Sample:
         annihilation_rate_l = np.ones(n_layers + 1)
         annihilation_rate_r = np.zeros(n_layers + 1)
 
-        """
-        The following is assumed in the values set below:
-        1) (For now) all positrons located on the first interval boundary annihilate into
-        the surface region, hence the left and right side diffusion_rate and the
-        right side annihilation rates are zero. Only the left side annihilation
-        rate is 1.
-
-        2) For now it is assumed that the last interval is infinitely large,
-        hence no second surface after the last layer. The left side annihilation
-        is 1, with all other rates being 0. This enforces that all positrons annihilate within the
-        defined layers. However, this definition has no effect, since no
-        positrons will be able to reach the last boundary anyway (it is
-        infinitely far away). This was done in preparation for a finite sized
-        layer, which would introduce a second surface at the end. To account for
-        this consideration, only the left and right side annihilation rates have
-        to be swapped: i.e. the right side annihilation rate is 1, with all
-        other rates being 0.
-        """
-
         # set diffusion and annihilation rates (to non-normalized values)
         diffusion_rate_l[1:-1] = diffusion_rate[:-1]
         diffusion_rate_r[1:-1] = diffusion_rate[1:]
