@@ -1,8 +1,5 @@
 import numpy as np
-import matplotlib
 import matplotlib.pyplot as plt
-
-from scipy import integrate
 
 import limpid
 from .limpid import Sample
@@ -250,7 +247,6 @@ def plot_fractions(
                'Sample.model_diffusion() first.')
         raise TypeError(err)
 
-    implantation_energies = sample.measurement_energies
     energies = np.linspace(sample.measurement_energies[0],
                            sample.measurement_energies[-1], 120)
     sample.model_diffusion(energies)
@@ -268,7 +264,7 @@ def plot_fractions(
     while len(colors) < len(annihilation_channels):
         colors += colors
 
-    if not fig is None:
+    if fig is not None:
         axs = fig.get_axes()
     else:
         fig, axs = plt.subplots(2, 1, sharex=True)

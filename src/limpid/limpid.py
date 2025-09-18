@@ -232,7 +232,6 @@ class Layer:
 
         u = 1 / self.diffusion_length
         thickness = self.thickness
-        diffusion_coeff = self.diffusion_coefficient
         exponential = u * thickness
         boltzmann_factor = np.exp(-self.positron_affinity
                             / (BOLTZMANN_CONSTANT * self.temperature))
@@ -372,7 +371,7 @@ class Sample:
                     of 'VEPFIT'", AIP Conf. Proc., Vol. 218, pp171-198, 1991.
         """
 
-        if type(layers) == Layer:
+        if type(layers) is Layer:
             self.layers = [layers]
         else:
             self.layers = layers
