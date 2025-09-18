@@ -461,7 +461,7 @@ class Sample:
             self.parameters.add('lineshape_epithermal', value=np.inf,
                                 vary=True, min=1E-15)
             self.parameters.add('diffusion_length_epithermal', value=1,
-                                vary=True, min=1E-5)
+                                vary=False, min=1E-5)
 
     def calc_implantation_profile(
         self,

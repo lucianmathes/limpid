@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix bug where data was missing in `plot_initial_guess`.
 - Correct (non-cumulative) fraction plots for the case of epithermal correction.
 - Cleaner appearance of fraction plots.
+- Fix epithermal scattering length to 1 nm by default.
 
 ### Removed
 - Legacy algorithm.
