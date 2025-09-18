@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 - Legacy algorithm.
+- Broken C implementation for faster implantation profile integration.
 
 ## [0.3.2] - 2025-07-21
 ### Added
