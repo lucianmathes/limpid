@@ -6,7 +6,7 @@ import numpy as np
 from scipy import integrate
 from functools import cache
 
-from .implantation import MakhovProfile, CMakhovProfile
+from .implantation import MakhovProfile
 
 
 BOLTZMANN_CONSTANT = 8.617333262e-05 # in eV/K
