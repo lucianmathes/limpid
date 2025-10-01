@@ -233,6 +233,8 @@ class Layer:
         exponential = self.thickness / self.diffusion_length
         boltzmann_factor = np.exp(-self.positron_affinity
                             / (BOLTZMANN_CONSTANT * self.temperature))
+        # The Boltzmann factor describes density. We need flux.
+        boltzmann_factor *= exponential
 
         # diffusion
         if exponential >= 700:
@@ -241,15 +243,15 @@ class Layer:
 
         elif exponential >= 30:
             # exp(-30) ~ 10^-15 -> truncated, since negligible
-            diffusion = 2 * np.exp(- exponential)
+            diffusion = 2 * np.exp(- exponential) * boltzmann_factor
 
         else:
-            diffusion = 1 / np.cosh(exponential)
+            diffusion = 1 / np.cosh(exponential) * boltzmann_factor
 
         # annihilation
-        annihilation = 1 - diffusion
+        annihilation = boltzmann_factor - diffusion
 
-        return diffusion * boltzmann_factor, annihilation * boltzmann_factor
+        return diffusion, annihilation
 
 
 class Surface:
@@ -606,10 +608,16 @@ class Sample:
         # normalize diffusion and annihilation rates
         sum_of_rates = (diffusion_rate_r + diffusion_rate_l + annihilation_rate_r
                         + annihilation_rate_l)
-        diffusion_rate_l = diffusion_rate_l / sum_of_rates
-        diffusion_rate_r = diffusion_rate_r / sum_of_rates
-        annihilation_rate_l = annihilation_rate_l / sum_of_rates
-        annihilation_rate_r = annihilation_rate_r / sum_of_rates
+        mask = np.isfinite(sum_of_rates)
+        diffusion_rate_l[mask] /= sum_of_rates[mask]
+        diffusion_rate_r[mask] /= sum_of_rates[mask]
+        annihilation_rate_l[mask] /= sum_of_rates[mask]
+        annihilation_rate_r[mask] /= sum_of_rates[mask]
+
+        diffusion_rate_l[~mask] = [1 if np.isinf(el) else 0 for el in diffusion_rate_l[~mask]]
+        diffusion_rate_r[~mask] = [1 if np.isinf(el) else 0 for el in diffusion_rate_r[~mask]]
+        annihilation_rate_l[~mask] = [1 if np.isinf(el) else 0 for el in annihilation_rate_r[~mask]]
+        annihilation_rate_r[~mask] = [1 if np.isinf(el) else 0 for el in annihilation_rate_l[~mask]]
 
         ### Markov Chain
         number_of_transient_states = len(self.layers) + 1

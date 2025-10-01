@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Use hyperbolic functions in first diffusion step to avoid numerical cancellation.
 - Use correct hyperbolic functions in second diffusion step and reduce calculations.
 - Cut unnecessary (u x D) factor from diffusion and annihilation rates.
+- Add necessary (u x D) factor to the Boltzmann factor.
 - Fix bug where data was missing in `plot_initial_guess`.
 - Correct (non-cumulative) fraction plots for the case of epithermal correction.
 - Cleaner appearance of fraction plots.
