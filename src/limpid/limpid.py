@@ -234,7 +234,7 @@ class Layer:
         boltzmann_factor = np.exp(-self.positron_affinity
                             / (BOLTZMANN_CONSTANT * self.temperature))
         # The Boltzmann factor describes density. We need flux.
-        boltzmann_factor *= exponential
+        boltzmann_factor *= self.diffusion_coefficient / self.diffusion_length
 
         # diffusion
         if exponential >= 700:
@@ -608,16 +608,10 @@ class Sample:
         # normalize diffusion and annihilation rates
         sum_of_rates = (diffusion_rate_r + diffusion_rate_l + annihilation_rate_r
                         + annihilation_rate_l)
-        mask = np.isfinite(sum_of_rates)
-        diffusion_rate_l[mask] /= sum_of_rates[mask]
-        diffusion_rate_r[mask] /= sum_of_rates[mask]
-        annihilation_rate_l[mask] /= sum_of_rates[mask]
-        annihilation_rate_r[mask] /= sum_of_rates[mask]
-
-        diffusion_rate_l[~mask] = [1 if np.isinf(el) else 0 for el in diffusion_rate_l[~mask]]
-        diffusion_rate_r[~mask] = [1 if np.isinf(el) else 0 for el in diffusion_rate_r[~mask]]
-        annihilation_rate_l[~mask] = [1 if np.isinf(el) else 0 for el in annihilation_rate_r[~mask]]
-        annihilation_rate_r[~mask] = [1 if np.isinf(el) else 0 for el in annihilation_rate_l[~mask]]
+        diffusion_rate_l /= sum_of_rates
+        diffusion_rate_r /= sum_of_rates
+        annihilation_rate_l /= sum_of_rates
+        annihilation_rate_r /= sum_of_rates
 
         ### Markov Chain
         number_of_transient_states = len(self.layers) + 1
