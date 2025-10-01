@@ -230,9 +230,7 @@ class Layer:
           rates used for the second part of the simulation.
         """
 
-        u = 1 / self.diffusion_length
-        thickness = self.thickness
-        exponential = u * thickness
+        exponential = self.thickness / self.diffusion_length
         boltzmann_factor = np.exp(-self.positron_affinity
                             / (BOLTZMANN_CONSTANT * self.temperature))
 
@@ -246,16 +244,10 @@ class Layer:
             diffusion = 2 * np.exp(- exponential)
 
         else:
-            diffusion = 2 / (np.exp(- exponential) * np.expm1(2 * exponential))
+            diffusion = 1 / np.cosh(exponential)
 
         # annihilation
-        if exponential >= 30:
-            # exp(-30) ~ 10^-15 -> truncated, since negligible
-            annihilation = 1
-
-        else:
-            annihilation = (np.exp(exponential) + np.exp(- exponential) - 2) / \
-                           (np.exp(- exponential) * np.expm1(2 * exponential))
+        annihilation = 1 - diffusion
 
         return diffusion * boltzmann_factor, annihilation * boltzmann_factor
 
