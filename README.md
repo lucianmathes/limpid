@@ -47,8 +47,8 @@ e, s = limpid.load_example_data('si')
 Provide a reasonable first guess and check using a plot.
 Note that `s` here is normalized to its last value (S<sub>bulk</sub> = 1).
 ```python
-sample.parameters["lineshape_0"].value = 0.96
-sample.parameters["lineshape_1"].value = 1
+sample.parameters["lineshape_0"].value = 0.635
+sample.parameters["lineshape_1"].value = 0.666
 
 limpid.plot_initial_guess(sample, e, s)
 ```
@@ -62,20 +62,20 @@ limpid.plot_result(sample)
 Let's print the resulting diffusion length of positrons in Si.
 ```python
 print(si.diffusion_length)
- >> 20.372042369666133
+ >> 390.6668158143418
 ```
 
-A diffusion length of 21 nm seems way to low for monocrystalline Si.
+If you look closely, the fit does not match the data at implantation energies below 2 keV.
 Let's try again with an epithermal correction.
 ```python
 sample = limpid.Sample(si, epithermal_correction=True)
 sample.fit(e, s, verbose=True)
  >> `gtol` termination condition is satisfied.
- >> Function evaluations 9, initial cost 2.9495e-04, final cost 3.0405e-06, first-order optimality 1.99e-09.
+ >> Function evaluations 7, initial cost 2.0814e-03, final cost 1.0762e-05, first-order optimality 2.48e-09.
  >> 
- >> Fit duration: 0.65819 s
+ >> Fit duration: 2.49621 s
  >> Diffusion length(s):
- >> - Si: (28.19705554 +/- 6.07149087) nm
+ >> - Si: (372.49612987 +/- 10.21031932) nm
 ```
 
 Plot the result (including initial guess).
@@ -106,14 +106,14 @@ e, s, ds = limpid.load_example_data('cu-si')
 ```
 
 Provide a reasonable first guess.
-Use accurate estimates where possible and fix known parameters (like the diffusion length of positrons in Si from Example 1) for a more stable fitting result.
+Use accurate estimates where possible and fix known parameters (like the diffusion length of positrons in the Si substrate from Example 1) for a more stable fitting result.
 Set `sample.parameters["thickness_{i}"].vary = True`, if you want the fit to determine a layer thickness.
 ```python
 sample.parameters["lineshape_0"].value = 0.62
 sample.parameters["lineshape_1"].value = 0.57
 sample.parameters["lineshape_2"].value = 0.65
 sample.parameters["diffusion_length_1"].value = 30
-sample.parameters["diffusion_length_2"].value = 165
+sample.parameters["diffusion_length_2"].value = 372
 sample.parameters["diffusion_length_2"].vary = False
 sample.parameters["thickness_1"].value = 350
 sample.parameters["thickness_1"].vary = True
@@ -131,6 +131,7 @@ sample.parameters.pretty_print()
 ```
 
 Now retry with an epithermal correction and see, if there are any differences.
+Also try to fix the Si lineshape parameter to the value obtained by Example 1 and see if that makes the fit more stable (faster convergence/smaller errors).
 You can find the entire script in `examples/example2_cu-si.py`.
 
 ## References

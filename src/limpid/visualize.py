@@ -53,9 +53,10 @@ def plot_initial_guess(
 
     fig, ax = plt.subplots()
 
-    if energies is not None and lineshape_delta is not None:
+    if energies is not None:
         e_min = energies[0]
         e_max = energies[-1]
+    if lineshape_delta is not None:
         ax.errorbar(energies, lineshape, lineshape_delta, ls='', capsize=3,
                     label="data")
     elif lineshape_delta is None:

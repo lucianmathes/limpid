@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Correct (non-cumulative) fraction plots for the case of epithermal correction.
 - Cleaner appearance of fraction plots.
 - Fix epithermal scattering length to 1 nm by default.
+- Update example scripts and tutorial in readme.
 
 ### Removed
 - Legacy algorithm.

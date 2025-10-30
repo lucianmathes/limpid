@@ -420,9 +420,6 @@ class Sample:
             if implantation_model == 'makhov':
                 layer.implantation_profile = MakhovProfile(
                                     [layer.density, *layer.makhov_parameters])
-            elif implantation_model == 'cmakhov':
-                layer.implantation_profile = CMakhovProfile(
-                                    [layer.density, *layer.makhov_parameters])
             else:
                 err = ( 'Unknown model for positron implantation '
                        f'"{implantation_model}". Please choose from "makhov" '
