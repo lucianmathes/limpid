@@ -42,7 +42,7 @@ class MakhovProfile(ImplantationProfile):
 
     Attributes:
       model_function: The implantation model function (for electrons) defined
-        in [Makhov]_.
+        in [Makhov]_. Note that we use A rather than A_1/2!
       parameters: Model specific parameters for the given type of material.
 
     References:

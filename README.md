@@ -34,7 +34,7 @@ Create a limpid Sample object containing the Si-specific parameters needed ([Dry
 ```python
 import limpid
 
-si = limpid.Layer(density=2.33, makhov_parameters=(2.48, 1.792, 1.99), name='Si')
+si = limpid.Layer(density=2.33, makhov_parameters=(2.48, 1.73, 1.99), name='Si')
 sample = limpid.Sample(si)
 ```
 
@@ -62,7 +62,7 @@ limpid.plot_result(sample)
 Let's print the resulting diffusion length of positrons in Si.
 ```python
 print(si.diffusion_length)
- >> 21.280334976471796
+ >> 20.372042369666133
 ```
 
 A diffusion length of 21 nm seems way to low for monocrystalline Si.
@@ -71,11 +71,11 @@ Let's try again with an epithermal correction.
 sample = limpid.Sample(si, epithermal_correction=True)
 sample.fit(e, s, verbose=True)
  >> `gtol` termination condition is satisfied.
- >> Function evaluations 35, initial cost 7.5210e-05, final cost 1.0650e-06, first-order optimality 9.75e-09.
+ >> Function evaluations 9, initial cost 2.9495e-04, final cost 3.0405e-06, first-order optimality 1.99e-09.
  >> 
- >> Fit duration: 3.06078 s
+ >> Fit duration: 0.65819 s
  >> Diffusion length(s):
- >> - Layer 1: (165.18248443 +/- 115.03995652) nm
+ >> - Si: (28.19705554 +/- 6.07149087) nm
 ```
 
 Plot the result (including initial guess).
@@ -94,7 +94,7 @@ Makhov parameters for a lot of materials have been calculated by ([Dryzek, 2008]
 ```python
 import limpid
 
-si = limpid.Layer(density=2.33, makhov_parameters=(2.48, 1.792, 1.99), name='Si')
+si = limpid.Layer(density=2.33, makhov_parameters=(2.48, 1.73, 1.99), name='Si')
 cu = limpid.Layer(density=8.96, makhov_parameters=(2.84, 1.67, 1.73), name='Cu')
 sample = limpid.Sample([cu, si])
 ```

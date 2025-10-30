@@ -1,7 +1,7 @@
 import limpid
 
 
-si = limpid.Layer(density=2.33, makhov_parameters=(2.48, 1.792, 1.99), name='Si')
+si = limpid.Layer(density=2.33, makhov_parameters=(2.48, 1.73, 1.99), name='Si')
 sample = limpid.Sample(si, epithermal_correction=True)
 
 e, s = limpid.load_example_data('si')

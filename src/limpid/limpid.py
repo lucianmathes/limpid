@@ -57,8 +57,8 @@ class Layer:
 
         Args:
           density: The density of the layer material.
-          makhov_parameters: Parameters A, n, m of the layer material used in the
-            Makhov implantation profile.
+          makhov_parameters: Parameters A, n, m of the layer material used in
+            the Makhov implantation profile. Do not confuse A for A_1/2!
           thickness: Thickness of the layer in nm.
           lineshape: Lineshape (e.g., S or W) value of the layer material.
           diffusion_length: Positron diffusion length in the layer.
