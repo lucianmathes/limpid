@@ -171,21 +171,17 @@ class Layer:
 
         @cache
         def concentration_left(z, thickness, u):
-            if np.isinf(thickness):
-                cl = np.exp(-u * z)
-            elif u * thickness > 500:
+            if u * thickness > 100:
                 # avoid overflow in np.sinh
-                numerator = np.exp(-u * z) - np.exp(u * (z - 2 * thickness))
-                denominator = 1 - np.exp(-2 * u * thickness)
-                cl = numerator / denominator
+                cl = np.exp(-u * z)
             else:
                 cl = np.sinh(u * (thickness - z)) / np.sinh(u * thickness)
             return cl
 
         @cache
         def concentration_right(z, thickness, u):
-            if np.isinf(thickness) or u * thickness > 700:
-                cr = 0
+            if u * thickness > 100:
+                cr = np.exp(-u * (thickness - z))
             else:
                 cr = np.sinh(u * z) / np.sinh(u * thickness)
             return cr
