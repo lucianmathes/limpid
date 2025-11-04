@@ -215,7 +215,7 @@ class Layer:
 
         return c_left, c_right, c_annihilated, c_implanted, offsets
 
-    def get_rates_for_second_part_of_diffusion(self) -> tuple[float, float]:
+    def get_rates_for_second_part_of_diffusion(self) -> tuple[np.ndarray, np.ndarray]:
         """Perform second computational step of the diffusion simulation.
 
         Calculates diffusion and annihilation probabilities for the diffusion
@@ -422,8 +422,8 @@ class Sample:
                                     [layer.density, *layer.makhov_parameters])
             else:
                 err = ( 'Unknown model for positron implantation '
-                       f'"{implantation_model}". Please choose from "makhov" '
-                        'and "cmakhov".')
+                       f'"{implantation_model}". Currently "makhov" is the'
+                        'only model available.')
                 raise NotImplementedError(err)
 
             if i == len(self.layers):
