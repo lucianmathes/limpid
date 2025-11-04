@@ -45,7 +45,6 @@ e, s = limpid.load_example_data('si')
 ```
 
 Provide a reasonable first guess and check using a plot.
-Note that `s` here is normalized to its last value (S<sub>bulk</sub> = 1).
 ```python
 sample.parameters["lineshape_0"].value = 0.635
 sample.parameters["lineshape_1"].value = 0.666
