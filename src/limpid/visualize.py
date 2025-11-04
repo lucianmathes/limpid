@@ -173,7 +173,7 @@ def plot_detailed_result(
         axs[0,0].scatter(sample.measurement_energies,
                          sample.measurement_lineshape, label='data')
         # manually step forward in the color cycle, because scatter doesn't
-        ax.plot([])
+        axs.plot([])
     else:
         axs[0,0].errorbar(sample.measurement_energies,
                           sample.measurement_lineshape,
