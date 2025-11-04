@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.4.0] - 2025-10-30
+## [0.4.0] - 2025-11-04
 ### Added
 - Warning if positive positron affinities are provided.
 - Colors option for `plot_fractions`.
@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Cut unnecessary (u x D) factor from diffusion and annihilation rates.
 - Add necessary (u x D) factor to the Boltzmann factor.
 - Fix bug where data was missing in `plot_initial_guess`.
+- Fix bug where wrong variable name was used in `plot_detailed_result`.
 - Correct (non-cumulative) fraction plots for the case of epithermal correction.
 - Cleaner appearance of fraction plots.
 - Fix epithermal scattering length to 1 nm by default.
