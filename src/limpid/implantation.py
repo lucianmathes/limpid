@@ -1,7 +1,8 @@
 from functools import cache
-from numba import njit, float64
+
 import numpy as np
 import math
+from numba import njit, float64
 
 
 class ImplantationProfile():

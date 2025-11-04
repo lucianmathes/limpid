@@ -1,10 +1,10 @@
 import time
 import copy
+from functools import cache
+
 import lmfit
 import numpy as np
-
 from scipy import integrate
-from functools import cache
 
 from .implantation import MakhovProfile
 
@@ -361,7 +361,7 @@ class Sample:
                     of 'VEPFIT'", AIP Conf. Proc., Vol. 218, pp171-198, 1991.
         """
 
-        if type(layers) is Layer:
+        if isinstance(layers, Layer):
             self.layers = [layers]
         else:
             self.layers = layers
@@ -515,9 +515,10 @@ class Sample:
 
         return zlist, plist
 
-    def model_diffusion(self,
-                        implantation_energies: tuple[float, ...]
-                        ):
+    def model_diffusion(
+        self,
+        implantation_energies: tuple[float, ...]
+    ) -> np.ndarray:
         """Simulate positron diffusion and return the resulting depth profile.
 
         Simluates positron diffusion starting from the implantation profile.
