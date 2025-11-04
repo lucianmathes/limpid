@@ -368,7 +368,6 @@ class Sample:
         self.name = name
         self.implantation_model = implantation_model
         self.epithermal_correction = epithermal_correction
-        self.temperature = temperature
         self.precision = precision
 
         self.parameters = lmfit.Parameters()
@@ -391,6 +390,8 @@ class Sample:
                                parameters=self.parameters,
                                precision=self.precision,
                                index=0)
+
+        self.temperature = temperature
 
         # copy of self to save the initial guess
         # Here we use a shallow copy to get parameter updates. We change it to
@@ -449,6 +450,17 @@ class Sample:
                                 vary=True, min=1E-15)
             self.parameters.add('diffusion_length_epithermal', value=1,
                                 vary=False, min=1E-5)
+
+    @property
+    def temperature(self):
+        return self._temperature
+
+    @temperature.setter
+    def temperature(self, value):
+        self._temperature = value
+        self.surface.temperature = value
+        for layer in self.layers:
+            layer.temperature = value
 
     def calc_implantation_profile(
         self,
