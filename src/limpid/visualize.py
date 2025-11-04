@@ -1,8 +1,5 @@
 import numpy as np
-import matplotlib
 import matplotlib.pyplot as plt
-
-from scipy import integrate
 
 import limpid
 from .limpid import Sample
@@ -59,8 +56,13 @@ def plot_initial_guess(
     if energies is not None:
         e_min = energies[0]
         e_max = energies[-1]
-        ax.errorbar(energies, lineshape ,lineshape_delta, ls='', capsize=3,
+    if lineshape_delta is not None:
+        ax.errorbar(energies, lineshape, lineshape_delta, ls='', capsize=3,
                     label="data")
+    elif lineshape_delta is None:
+        ax.scatter(energies, lineshape, label="data")
+        # manually step forward in the color cycle, because scatter doesn't
+        ax.plot([])
     elif sample.measurement_energies is not None:
         e_min = sample.measurement_energies[0]
         e_max = sample.measurement_energies[-1]
@@ -171,7 +173,7 @@ def plot_detailed_result(
         axs[0,0].scatter(sample.measurement_energies,
                          sample.measurement_lineshape, label='data')
         # manually step forward in the color cycle, because scatter doesn't
-        ax.plot([])
+        axs.plot([])
     else:
         axs[0,0].errorbar(sample.measurement_energies,
                           sample.measurement_lineshape,
@@ -216,6 +218,7 @@ def plot_detailed_result(
 def plot_fractions(
     sample: limpid.Sample,
     cumulative: bool = True,
+    colors: list[str]|None = None,
     save: bool = True,
     show: bool = True,
     savename: str = 'positron_fractions.pdf',
@@ -228,8 +231,10 @@ def plot_fractions(
 
     Args:
       sample: The Sample object containing all the data.
-      show: Show a popup window containing the plot.
+      cumulative: Choose between cumulative and normal plotting.
+      colors: List of colors recognized by matplotlib.
       save: Save the figure to a file.
+      show: Show a popup window containing the plot.
       savename : Filepath to save the figure at.
       fig: matplotlib.pyplot.Figure instance used for plotting.
 
@@ -237,17 +242,16 @@ def plot_fractions(
       A tuple of the matplotlib Figure and Axes objects.
     """
 
-    if type(sample.markov_vector) == bool:
+    if sample.annihilation_fractions is None:
         err = ('Cannot create plot of implanted and annihilated fractions '
                'without modelling diffusion. Call Sample.fit() or '
                'Sample.model_diffusion() first.')
         raise TypeError(err)
 
-    implantation_energies = sample.measurement_energies
     energies = np.linspace(sample.measurement_energies[0],
                            sample.measurement_energies[-1], 120)
     sample.model_diffusion(energies)
-    annihilation_fractions = sample.markov_vector.transpose()
+    annihilation_fractions = sample.annihilation_fractions
     annihilation_channels = ['surface', *[l.name for l in sample.layers]]
 
     if sample.epithermal_correction:
@@ -256,11 +260,12 @@ def plot_fractions(
     else:
         skip_colors = 1
 
-    colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+    if colors is None:
+        colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
     while len(colors) < len(annihilation_channels):
         colors += colors
 
-    if not fig is None:
+    if fig is not None:
         axs = fig.get_axes()
     else:
         fig, axs = plt.subplots(2, 1, sharex=True)
@@ -270,8 +275,9 @@ def plot_fractions(
         cumsum_implantation = np.zeros_like(sample.implantation_fractions[0])
         for i, layer in enumerate(sample.layers):
             cumsum_implantation += sample.implantation_fractions[i]
-            axs[0].plot(energies, cumsum_implantation, linestyle='-',
-                        marker='', color='black')
+            if i < len(annihilation_channels) - 1:
+                axs[0].plot(energies, cumsum_implantation, color='black',
+                            linewidth=1)
             axs[0].fill_between(x=energies,
                         y1=cumsum_implantation-sample.implantation_fractions[i],
                         y2=cumsum_implantation, color=colors[i+skip_colors])
@@ -279,21 +285,23 @@ def plot_fractions(
         # annihilation fractions
         cumsum_annihilation = np.zeros_like(sample.implantation_fractions[0])
         for i, channel_name in enumerate(annihilation_channels):
-            cumsum_annihilation += annihilation_fractions[i]
-            axs[1].plot(energies, cumsum_annihilation, color='black')
+            cumsum_annihilation += annihilation_fractions.T[i]
+            if i < len(annihilation_channels) - 1:
+                axs[1].plot(energies, cumsum_annihilation, color='black',
+                            linewidth=1)
             axs[1].fill_between(x=energies,
-                    y1=cumsum_annihilation-annihilation_fractions[i],
+                    y1=cumsum_annihilation-annihilation_fractions.T[i],
                     y2=cumsum_annihilation, color=colors[i], label=channel_name)
         axs[0].xaxis.set_ticks_position('top')
-        axs[0].set_ylim(0, 1.01)
-        axs[1].set_ylim(1.01, 0)
+        axs[0].set_ylim(0, 1)
+        axs[1].set_ylim(1, 0)
         fig.subplots_adjust(hspace=.0)
     else:
         for i, layer in enumerate(sample.layers):
             axs[0].plot(energies, sample.implantation_fractions[i], linestyle='-',
                         marker='', color=colors[i+skip_colors])
         for i, channel_name in enumerate(annihilation_channels):
-            axs[1].plot(energies, annihilation_fractions[i], color=colors[i], label=channel_name)
+            axs[1].plot(energies, annihilation_fractions.T[i], color=colors[i], label=channel_name)
         axs[0].set_ylim(-0.01, 1.01)
         axs[1].set_ylim(-0.01, 1.01)
 

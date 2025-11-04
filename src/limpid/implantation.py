@@ -1,13 +1,9 @@
-from scipy import integrate
 from functools import cache
-from numba import njit, float64
+
 import numpy as np
 import math
-import os
-from .c_libraries.compile_c_libs import compile_cmakhov_lib_gcc
-from ctypes import *
+from numba import njit, float64
 
-PATH_TO_CMAKHOV_LIBRARY = os.path.expanduser("~/.limpid/makhov.so")
 
 class ImplantationProfile():
     """A parent class for all types of positron implantation profile.
@@ -47,14 +43,13 @@ class MakhovProfile(ImplantationProfile):
 
     Attributes:
       model_function: The implantation model function (for electrons) defined
-        in [Makhov]_.
+        in [Makhov]_. Note that we use A rather than A_1/2!
       parameters: Model specific parameters for the given type of material.
 
     References:
       .. [Makhov] A.F. Makhov, "The penetration of electrons into solids. 2.
                   The distribution of electrons in Depth", Sov. Pys. Solid
                   State, Vol. 2, Number 9, pp1942-1944, 1960.
-
     """
 
     def __init__(self, parameters):
@@ -81,44 +76,3 @@ class MakhovProfile(ImplantationProfile):
             implanted = 1 - 1E-15
 
         return z_0 * np.power(-np.log(1 - implanted), 1 / m)
-
-
-class CMakhovProfile(ImplantationProfile):
-
-    def __init__(self, parameters):
-        super().__init__(makhov_profile, parameters)
-
-    def get_depth(self, implanted, energy):
-        rho, a, n, m = self.parameters
-        return makhov_depth(rho, a, n, m, implanted, energy)
-
-    def solve_first_diffusion_step(self, diffusionlength, thickness, precision, energies, prev_implanted):
-        u = 1 / diffusionlength
-
-        prec_exp = 10 ** (-precision)
-
-        if not os.path.exists(PATH_TO_CMAKHOV_LIBRARY):
-            compile_cmakhov_lib_gcc()
-
-        liblimpid = CDLL(f"{PATH_TO_CMAKHOV_LIBRARY}")
-        ARRAY_POINTER = np.ctypeslib.ndpointer(dtype=np.float64, ndim=1, flags="C")
-
-        liblimpid.makhov_integration_func.argtypes = [c_int, ARRAY_POINTER, ARRAY_POINTER, ARRAY_POINTER, ARRAY_POINTER, ARRAY_POINTER,
-                                                      ARRAY_POINTER, ARRAY_POINTER, c_double, c_double, c_double, c_double,
-                                                      c_double, c_double, c_double]
-
-        num_of_e = len(energies)
-
-        energies = np.asarray(energies)
-        c_left = np.zeros_like(energies)
-        c_right = np.zeros_like(energies)
-        c_ann = np.zeros_like(energies)
-        c_implanted = np.zeros_like(energies)
-        offsets = np.zeros_like(energies)
-
-        rho, a, n, m = self.parameters
-
-        liblimpid.makhov_integration_func(num_of_e, c_left, c_right, c_ann, c_implanted, offsets, prev_implanted, energies,
-                                          thickness, rho, a, n, m, u, prec_exp)
-
-        return c_left, c_right, c_ann, c_implanted, offsets
