@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Cleaner appearance of fraction plots.
 - Fix epithermal scattering length to 1 nm by default.
 - Update example scripts and tutorial in readme.
+- Sample temperature can now be updated after intialization.
 
 ### Removed
 - Legacy algorithm.
