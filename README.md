@@ -147,5 +147,5 @@ limpid.plot_fractions(sample)
 ```
 
 ## References
-- J. Dryzek (2008), "GEANT4 simulation of slow positron beam implantation profiles", Nucl. Instrum. Methods Phys. Res. B, Vol. 266, Number 18, pp4000.
-- M. Puska (1989), "Positron affinities for elemental metals", J. Phys.: Condens. Matter 1 6081, pp6081
+- J. Dryzek (2008), "GEANT4 simulation of slow positron beam implantation profiles", Nucl. Instrum. Methods Phys. Res. B, Vol. 266, Number 18, pp4000
+- M. Puska (1989), "Positron affinities for elemental metals", J. Phys.: Condens. Matter, Vol. 1, Number 35, pp6081
