@@ -16,7 +16,7 @@ For an explanation of the LIMPID algorithm and for citation purposes, please ref
 Via Package index of gitlab.lrz.de 
 ```
 pip install --upgrade pip
-pip install limpid --index-url https://gitlab+deploy-token-2044:gldt-mTjywbYYyhsXerAJys29@gitlab.lrz.de/api/v4/projects/113374/packages/pypi/simple
+pip install limpid
 ```
 
 # Getting Started
