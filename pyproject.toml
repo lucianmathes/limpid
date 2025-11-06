@@ -1,8 +1,7 @@
 [project] 
 name = "limpid" 
 requires-python = ">=3.10"
-authors = [{name = "Lucian Mathes", email = "lucian.mathes@tum.de"},
-	   {name = "Michael Goeldl"}
+authors = [{name = "Lucian Mathes", email = "lucian.mathes@tum.de"}
 ] 
 description = "A package for fitting positron annihilation Doppler broadening depth profiles."
 dependencies = [ "setuptools", "numpy", "scipy", "matplotlib", "lmfit", "numba" ] 
