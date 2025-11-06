@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.4.2] - 2025-11-06
 ### Changed
 - Fixed deployment to PyPi. Limpid can now be easily installed via pip.
+- Updated installation instructions in readme.
 
 
 ## [0.4.1] - 2025-11-06
@@ -15,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Link to the paper preprint in the readme.
 - Section about positron affinities in the tutorial.
 - Instructions on how to contribute in a separate file.
-- GitHub CI and deploy.
+- Inttroduce GitHub CI and deployment.
 
 ### Changed
 - Correct the tutorial in the readme.
