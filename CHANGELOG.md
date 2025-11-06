@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Link to the paper preprint in the readme.
 - Section about positron affinities in the tutorial.
+- GitHub CI and deploy.
 - Codeowners file.
 - `CONTRIBUTING.md`.
 
