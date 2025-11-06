@@ -16,3 +16,5 @@ htmlcov/
 .DS_Store
 Thumbs.db
 *.egg-info*
+build/
+dist/
