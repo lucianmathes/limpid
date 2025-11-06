@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Correct the tutorial in the readme.
+- Update gitignore.
 
 ### Removed
 - GitLab leftovers from moving the repository.
