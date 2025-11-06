@@ -9,6 +9,7 @@
 
 LIMPID helps you with analyzing your positron annihilation depth profiles.
 It will fit the solution of the diffusion equation to your measurement data and thereby determine the positron diffusion length in your sample.
+For an explanation of the LIMPID algorithm and for citation purposes, please refer to [our paper](https://arxiv.org/abs/2511.02889).
 
 # Installation
 
