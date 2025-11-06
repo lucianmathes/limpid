@@ -13,24 +13,18 @@ For an explanation of the LIMPID algorithm and for citation purposes, please ref
 
 # Installation
 
-## For Users
 Via Package index of gitlab.lrz.de 
 ```
 pip install --upgrade pip
 pip install limpid --index-url https://gitlab+deploy-token-2044:gldt-mTjywbYYyhsXerAJys29@gitlab.lrz.de/api/v4/projects/113374/packages/pypi/simple
 ```
 
-## For Developers
-Clone the repository then inside the directory run
-```
-pip install --upgrade pip
-pip install --editable .
-```
-
 # Getting Started
+
 Learn how to use LIMPID by following these example applications.
 
 ## Example 1: A Si Monocrystal
+
 Create a limpid Sample object containing the Si-specific parameters needed ([Dryzek, 2008](#references)).
 ```python
 import limpid
@@ -89,6 +83,7 @@ You can find the entire script in `examples/example1_si.py`.
 
 
 ## Example 2: A Thin Cu Layer on a Si Substrate
+
 Recreate the physical layers of the sample.
 Makhov parameters for a lot of materials have been calculated by ([Dryzek, 2008](#references)).
 ```python
@@ -147,5 +142,6 @@ limpid.plot_fractions(sample)
 ```
 
 ## References
+
 - J. Dryzek (2008), "GEANT4 simulation of slow positron beam implantation profiles", Nucl. Instrum. Methods Phys. Res. B, Vol. 266, Number 18, pp4000
 - M. Puska (1989), "Positron affinities for elemental metals", J. Phys.: Condens. Matter, Vol. 1, Number 35, pp6081
