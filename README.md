@@ -134,5 +134,18 @@ Now retry with an epithermal correction and see, if there are any differences.
 Also try to fix the Si lineshape parameter to the value obtained by Example 1 and see if that makes the fit more stable (faster convergence/smaller errors).
 You can find the entire script in `examples/example2_cu-si.py`.
 
+Note further, that different materials have different positron affinities ([Puska, 1989](#references)).
+In layered systems this can result in preferred diffusion directions.
+Try it and compare the positron annihilation fractions with and without affinities.
+```python
+si = limpid.Layer(density=2.33, makhov_parameters=(2.48, 1.73, 1.99), positron_affinity=-6.95, name='Si')
+cu = limpid.Layer(density=8.96, makhov_parameters=(2.84, 1.67, 1.73), positron_affinity=-4.81, name='Cu')
+
+ [...]
+
+limpid.plot_fractions(sample)
+```
+
 ## References
-- J. Dryzek, "GEANT4 simulation of slow positron beam implantation profiles", Nucl. Instrum. Methods Phys. Res. B, Vol. 266, Number 18, pp4000.
+- J. Dryzek (2008), "GEANT4 simulation of slow positron beam implantation profiles", Nucl. Instrum. Methods Phys. Res. B, Vol. 266, Number 18, pp4000.
+- M. Puska (1989), "Positron affinities for elemental metals", J. Phys.: Condens. Matter 1 6081, pp6081
