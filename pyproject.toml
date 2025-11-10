@@ -20,6 +20,9 @@ dynamic = ["version", "readme"]
 version = {attr = "limpid.__version__"}
 readme = {file = "README.md", content-type = "text/markdown"}
 
+[tool.setuptools.package-data]
+limpid = ["example_data/*.csv"]
+
 [build-system]
 requires = [
     "setuptools>=42",
