@@ -1,25 +1,33 @@
 [project] 
 name = "limpid" 
 requires-python = ">=3.10"
-authors = [{name = "Lucian Mathes", email = "lucian.mathes@tum.de"},
-	   {name = "Michael Goeldl"}
-] 
+authors = [{name = "Lucian Mathes", email = "lucian.mathes@tum.de"}] 
 description = "A package for fitting positron annihilation Doppler broadening depth profiles."
-dependencies = [ "setuptools", "numpy", "scipy", "matplotlib", "lmfit", "numba" ] 
-classifiers = [  "Development Status :: 2 - Pre-Alpha",  
-		"Environment :: Console",  
-		"Intended Audience :: Science/Research",  
-		"License :: OSI Approved :: GNU General Public License v3 (GPLv3)",  
-		"Natural Language :: English",  
-    		"Operating System :: OS Independent",
-		"Programming Language :: Python :: 3",  
-		"Topic :: Scientific/Engineering :: Physics" 
+classifiers = [ 
+  "Development Status :: 2 - Pre-Alpha",  
+  "Environment :: Console",  
+  "Intended Audience :: Science/Research",  
+  "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",  
+  "Natural Language :: English",  
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",  
+  "Topic :: Scientific/Engineering :: Physics" 
+]
+dependencies = [
+  "numpy>=2.1.0",
+  "scipy>=1.15.0",
+  "matplotlib>=3.9.0",
+  "numba>=0.61.0",
+  "lmfit>=1.3.3"
 ]
 dynamic = ["version", "readme"]
 
 [tool.setuptools.dynamic]
 version = {attr = "limpid.__version__"}
-readme = {file = "README.md"}
+readme = {file = "README.md", content-type = "text/markdown"}
+
+[tool.setuptools.package-data]
+limpid = ["example_data/*.csv"]
 
 [build-system]
 requires = [

@@ -9,27 +9,20 @@
 
 LIMPID helps you with analyzing your positron annihilation depth profiles.
 It will fit the solution of the diffusion equation to your measurement data and thereby determine the positron diffusion length in your sample.
+For an explanation of the LIMPID algorithm and for citation purposes, please refer to [our paper](https://arxiv.org/abs/2511.02889).
 
 # Installation
-
-## For Users
-Via Package index of gitlab.lrz.de 
 ```
 pip install --upgrade pip
-pip install limpid --index-url https://gitlab+deploy-token-2044:gldt-mTjywbYYyhsXerAJys29@gitlab.lrz.de/api/v4/projects/113374/packages/pypi/simple
-```
-
-## For Developers
-Clone the repository then inside the directory run
-```
-pip install --upgrade pip
-pip install --editable .
+pip install limpid
 ```
 
 # Getting Started
+
 Learn how to use LIMPID by following these example applications.
 
 ## Example 1: A Si Monocrystal
+
 Create a limpid Sample object containing the Si-specific parameters needed ([Dryzek, 2008](#references)).
 ```python
 import limpid
@@ -45,7 +38,6 @@ e, s = limpid.load_example_data('si')
 ```
 
 Provide a reasonable first guess and check using a plot.
-Note that `s` here is normalized to its last value (S<sub>bulk</sub> = 1).
 ```python
 sample.parameters["lineshape_0"].value = 0.635
 sample.parameters["lineshape_1"].value = 0.666
@@ -89,6 +81,7 @@ You can find the entire script in `examples/example1_si.py`.
 
 
 ## Example 2: A Thin Cu Layer on a Si Substrate
+
 Recreate the physical layers of the sample.
 Makhov parameters for a lot of materials have been calculated by ([Dryzek, 2008](#references)).
 ```python
@@ -134,5 +127,19 @@ Now retry with an epithermal correction and see, if there are any differences.
 Also try to fix the Si lineshape parameter to the value obtained by Example 1 and see if that makes the fit more stable (faster convergence/smaller errors).
 You can find the entire script in `examples/example2_cu-si.py`.
 
+Note further, that different materials have different positron affinities ([Puska, 1989](#references)).
+In layered systems this can result in preferred diffusion directions.
+Try it and compare the positron annihilation fractions with and without affinities.
+```python
+si = limpid.Layer(density=2.33, makhov_parameters=(2.48, 1.73, 1.99), positron_affinity=-6.95, name='Si')
+cu = limpid.Layer(density=8.96, makhov_parameters=(2.84, 1.67, 1.73), positron_affinity=-4.81, name='Cu')
+
+ [...]
+
+limpid.plot_fractions(sample)
+```
+
 ## References
-- J. Dryzek, "GEANT4 simulation of slow positron beam implantation profiles", Nucl. Instrum. Methods Phys. Res. B, Vol. 266, Number 18, pp4000.
+
+- J. Dryzek (2008), "GEANT4 simulation of slow positron beam implantation profiles", Nucl. Instrum. Methods Phys. Res. B, Vol. 266, Number 18, pp4000
+- M. Puska (1989), "Positron affinities for elemental metals", J. Phys.: Condens. Matter, Vol. 1, Number 35, pp6081

@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.2] - 2025-11-18
+### Changed
+- Fix deployment to PyPi. Limpid can now be easily installed via pip.
+- Fix shipping of example data if installed via packaging index.
+- Update installation instructions in readme.
+
+### Removed
+- Leftovers of the C implementation.
+
+
+## [0.4.1] - 2025-11-06
+### Added
+- Link to the paper preprint in the readme.
+- Section about positron affinities in the tutorial.
+- Instructions on how to contribute in a separate file.
+- Introduce GitHub CI and deployment.
+
+### Changed
+- Correct the tutorial in the readme.
+
+### Removed
+- GitLab leftovers from moving the repository.
+
 ## [0.4.0] - 2025-11-04
 ### Added
 - Warning if positive positron affinities are provided.

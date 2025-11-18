@@ -1,8 +1,10 @@
 import os
 import numpy as np
+from importlib import resources
 
-ddir = os.path.dirname(os.path.realpath(__file__))
-datasets = [d.rstrip('.csv') for d in os.listdir(ddir) if d.endswith('.csv')]
+
+ddir = resources.files("limpid").joinpath("example_data")
+datasets = [d.stem for d in ddir.iterdir() if d.suffix == '.csv']
 
 def load_example_data(dname: str):
     """Load example dataset.
@@ -24,8 +26,11 @@ def load_example_data(dname: str):
         err = (f'Dataset does not exist. Valid datasets names are: {datasets}')
         raise ValueError(err)
     # Load dataset
-    filepath = os.path.join(ddir, dname + ".csv")
-    return np.transpose(np.genfromtxt(filepath, delimiter=","))
+    with resources.as_file(
+        resources.files("limpid").joinpath("example_data", dname + ".csv")
+    ) as filepath:
+        data =  np.transpose(np.genfromtxt(filepath, delimiter=","))
+    return data
 
 def list_example_data():
     """List available example datasets.
