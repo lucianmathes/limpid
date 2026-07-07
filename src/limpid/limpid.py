@@ -5,6 +5,7 @@ from functools import cache
 import lmfit
 import numpy as np
 from scipy import integrate
+from scipy.constants import e
 
 from .implantation import MakhovProfile
 
@@ -50,6 +51,8 @@ class Layer:
         diffusion_length: float = 70,
         diffusion_coefficient: float = 1,
         positron_affinity: float = -1,
+        potential: float | None = None,
+        relative_permittivity: float = 1,
         precision: int = 8,
         index: int|None = None
     ):
@@ -98,6 +101,8 @@ class Layer:
                             value=diffusion_length, vary=True, min=1E-15)
         self.parameters.add(f'diffusion_coefficient_{self.index}',
                             value=diffusion_coefficient, vary=False, min=1E-15)
+        self.parameters.add(f'electrical_mobility_{self.index}',
+                            value=1, vary=True, min=1E-15)
 
         if positron_affinity > 0:
             wrn = ('The positron affinity must be negative. Using default '
@@ -107,6 +112,11 @@ class Layer:
 
         self.positron_affinity = positron_affinity
         self.temperature = 293
+
+        self.relative_permittivity = relative_permittivity
+        self.potential = potential
+
+        self.electric_field = 0.
 
     @property
     def thickness(self):
@@ -131,6 +141,14 @@ class Layer:
     @diffusion_length.setter
     def diffusion_length(self, value):
         self.parameters[f'diffusion_length_{self.index}'].value = value
+
+    @property
+    def mobility(self):
+        return self.parameters[f'electrical_mobility_{self.index}'].value
+
+    @mobility.setter
+    def mobility(self, value):
+        self.parameters[f'electrical_mobility_{self.index}'].value = value
 
     @property
     def diffusion_coefficient(self):
@@ -170,20 +188,34 @@ class Layer:
         prec_exp = 10 ** (-self.precision)
 
         @cache
-        def concentration_left(z, thickness, u):
-            if u * thickness > 100:
-                # avoid overflow in np.sinh
-                cl = np.exp(-u * z)
+        def concentration_left(z, thickness, u, v, w):
+            if v > 0:
+                exp_v = np.exp(-v * z)
             else:
-                cl = np.sinh(u * (thickness - z)) / np.sinh(u * thickness)
+                exp_v = 1 / (np.exp(v * z) + 1e-15)
+
+            if np.isinf(thickness):
+                cl = exp_v
+            elif w * thickness > 30:
+                # avoid overflow in np.sinh
+                cl = exp_v * np.exp(-w * z)
+            else:
+                cl = exp_v * np.sinh(w * (thickness - z)) / np.sinh(w * thickness)
             return cl
 
         @cache
-        def concentration_right(z, thickness, u):
-            if u * thickness > 100:
-                cr = np.exp(-u * (thickness - z))
+        def concentration_right(z, thickness, u, v, w):
+            if v > 0:
+                exp_v = 1 / (np.exp(-v * (thickness - z)) + 1e-15)
             else:
-                cr = np.sinh(u * z) / np.sinh(u * thickness)
+                exp_v = np.exp(v * (thickness - z))
+
+            if np.isinf(thickness):
+                cr = np.zeros_like(z)
+            elif w * thickness > 30:
+                cr = exp_v * np.exp(-u * (thickness - z))
+            else:
+                cr = exp_v * np.sinh(u * z) / np.sinh(u * thickness)
             return cr
 
         def integral(f, max_depth):
@@ -199,18 +231,34 @@ class Layer:
         c_annihilated = np.zeros_like(implantation_energies)
         c_implanted = np.zeros_like(implantation_energies)
 
+        u = 1 / self.diffusion_length
+        v = 0.5 * self.electric_field * self.mobility * e / self.diffusion_coefficient
+        w = np.sqrt(u**2 + v**2)
+
         for i, energy in enumerate(implantation_energies):
             offset = self.implantation_profile.get_depth(
-                             previously_implanted[i], energy,
-                             *self.implantation_profile.parameters)
+                previously_implanted[i],
+                energy,
+                *self.implantation_profile.parameters
+            )
             max_depth = self.implantation_profile.get_depth(
-                             1, energy, *self.implantation_profile.parameters)
+                1, energy, *self.implantation_profile.parameters
+            )
             offsets[i] = offset
-            c_left[i] = integral(lambda z: self.implantation_profile(z + offset, energy) *
-                    concentration_left(z, self.thickness, 1/self.diffusion_length), max_depth)
-            c_right[i] = integral(lambda z: self.implantation_profile(z + offset, energy) *
-                    concentration_right(z, self.thickness, 1/self.diffusion_length), max_depth)
-            c_implanted[i] = integral(lambda z: self.implantation_profile(z + offset, energy), max_depth)
+            c_left[i] = integral(
+                lambda z: self.implantation_profile(z + offset, energy) *
+                    concentration_left(z, self.thickness, u, v, w),
+                max_depth
+            )
+            c_right[i] = integral(
+                lambda z: self.implantation_profile(z + offset, energy) *
+                    concentration_right(z, self.thickness, u, v, w),
+                max_depth
+            )
+            c_implanted[i] = integral(
+                lambda z: self.implantation_profile(z + offset, energy),
+                max_depth
+            )
             c_annihilated[i] = c_implanted[i] - c_left[i] - c_right[i]
 
         return c_left, c_right, c_annihilated, c_implanted, offsets
@@ -226,14 +274,16 @@ class Layer:
           rates used for the second part of the simulation.
         """
         u = 1 / self.diffusion_length
+        v = 0.5 * self.electric_field * self.mobility * e / self.diffusion_coefficient
+        w = np.sqrt(u**2 + v**2)
 
-        exponential = u * self.thickness
+        exponential = w * self.thickness
         boltzmann_factor = np.exp(
             -self.positron_affinity / (BOLTZMANN_CONSTANT * self.temperature)
         )
 
         # The Boltzmann factor describes density. We need flux.
-        boltzmann_factor *= self.diffusion_coefficient * u
+        boltzmann_factor *= self.diffusion_coefficient * w
 
         if exponential >= 700:
             sinh = np.inf
@@ -245,14 +295,19 @@ class Layer:
             sinh = np.sinh(exponential)
             tanh = np.tanh(exponential)
 
+        if v > 0:
+            exp_v = 1 / (np.exp(-v * self.thickness) + 1e-15)
+        else:
+            exp_v = np.exp(v * self.thickness)
+
         # Notation J, N, A as in the paper
 
         if np.isinf(self.thickness):
             J = 0.
         else:
-            J = boltzmann_factor / sinh
+            J = boltzmann_factor * exp_v / sinh
 
-        N = boltzmann_factor / tanh
+        N = boltzmann_factor * (1 / tanh + v / w)
 
         A = N - J
 
@@ -410,6 +465,8 @@ class Sample:
         # add fit parameters for the surface
         self.parameters.add('lineshape_0', value=np.inf, vary=True, min=1E-15)
 
+        self.calculate_electric_fields()
+
         # for every layer: set the correct index and define the implantation
         # profile
         for i, layer in enumerate(self.layers):
@@ -420,9 +477,19 @@ class Sample:
             for name, p in layer.parameters.items():
                 # copy all parameters from the Layer object and assign the
                 # correct index to them
-                self.parameters.add(f'{name.rsplit("_", maxsplit=1)[0]}_{i}',
-                                    value=p.value, vary=p.vary,
-                                    min=p.min, max=p.max)
+                if (
+                    name.startswith("electrical_mobility")
+                    and layer.electric_field == 0.
+                ):
+                    self.parameters.add(
+                        f'{name.rsplit("_", maxsplit=1)[0]}_{i}',
+                        value=p.value, vary=False, min=p.min, max=p.max
+                    )
+                else:
+                    self.parameters.add(
+                        f'{name.rsplit("_", maxsplit=1)[0]}_{i}',
+                        value=p.value, vary=p.vary, min=p.min, max=p.max
+                    )
 
             # make layer.parameters a pointer to Sample.parameters
             layer.parameters = self.parameters
@@ -470,6 +537,53 @@ class Sample:
         self.surface.temperature = value
         for layer in self.layers:
             layer.temperature = value
+
+    def calculate_electric_fields(self):
+        n_layers = len(self.layers)
+
+        for layer in self.layers:
+            layer.electric_field = 0.
+
+        if n_layers < 3:
+            return
+
+        potentials = [layer.potential for layer in self.layers]
+
+        def find_potential(start_idx):
+            for i in range(start_idx, n_layers):
+                if potentials[i] is not None:
+                        return i
+
+            return None
+
+        left_potential_idx = find_potential(0)
+
+        while left_potential_idx is not None:
+            right_potential_idx = find_potential(left_potential_idx + 1)
+
+            if right_potential_idx is None:
+                return
+
+            if right_potential_idx > left_potential_idx + 1:
+                left_potential = self.layers[left_potential_idx].potential
+                right_potential = self.layers[right_potential_idx].potential
+
+                assert left_potential is not None
+                assert right_potential is not None
+
+                u = left_potential - right_potential
+
+                layers = self.layers[left_potential_idx + 1:right_potential_idx]
+
+                thicknesses = [layer.thickness * 1e-9 for layer in layers]
+                perms = [layer.relative_permittivity for layer in layers]
+
+                D = u / sum(d / eps for d, eps in zip(thicknesses, perms))
+
+                for layer in layers:
+                    layer.electric_field = D / layer.relative_permittivity
+
+            left_potential_idx = right_potential_idx
 
     def calc_implantation_profile(
         self,
@@ -753,7 +867,7 @@ class Sample:
             msg = (f'\nFit duration: {fit_duration} s'
                     '\nDiffusion length(s):')
             for layer in self.layers:
-                diffusion_length_err = result_params[f'diffusion_length_{layer.index}'].stderr
+                diffusion_length_err = result_params[f'diffusion_length_{layer.index}'].stderr or np.nan
                 msg += (f'\n- {layer.name}: '
                         f'({np.round(layer.diffusion_length, self.precision)} '
                         f'+/- {np.round(diffusion_length_err, self.precision)}'
