@@ -21,15 +21,15 @@ for voltage in [0, 6]:
         density=2.33,
         makhov_parameters=(2.48, 1.73, 1.99),
         name='Si',
-        potential=-voltage,
+        potential=voltage,
     )
     sample = limpid.Sample([al, sio2, si], epithermal_correction=True)
 
     e, s, ds = limpid.load_example_data(f'al-sio2-si_{voltage}v')
 
     sample.parameters["lineshape_0"].value = 0.643
-    sample.parameters["lineshape_1"].value = 0.860
-    sample.parameters["lineshape_2"].value = 0.592
+    sample.parameters["lineshape_1"].value = 1.159
+    sample.parameters["lineshape_2"].value = 0.593
     sample.parameters["lineshape_3"].value = 0.630
     sample.parameters["lineshape_epithermal"].value = 0.506
     sample.parameters["diffusion_length_1"].value = 80.0
@@ -39,5 +39,7 @@ for voltage in [0, 6]:
 
     sample.fit(e, s, ds, verbose=True)
     limpid.plot_result(sample, show_init=True)
+
+    limpid.plot_fractions(sample, savename=f"positron_fractions_{voltage}V.pdf")
 
     sample.parameters.pretty_print()
