@@ -27,25 +27,15 @@ for voltage in [0, 6]:
 
     e, s, ds = limpid.load_example_data(f'al-sio2-si_{voltage}v')
 
-    sample.parameters["lineshape_0"].value = 0.635
-    sample.parameters["lineshape_1"].value = 1.017
-    sample.parameters["lineshape_2"].value = 0.606
-    sample.parameters["lineshape_3"].value = 0.674
-    sample.parameters["lineshape_epithermal"].value = 0.538
-    sample.parameters["diffusion_length_1"].value = 64.5
-    sample.parameters["diffusion_length_2"].value = 4.5
-    sample.parameters["diffusion_length_3"].value = 12.0
+    sample.parameters["lineshape_0"].value = 0.643
+    sample.parameters["lineshape_1"].value = 0.860
+    sample.parameters["lineshape_2"].value = 0.592
+    sample.parameters["lineshape_3"].value = 0.630
+    sample.parameters["lineshape_epithermal"].value = 0.506
+    sample.parameters["diffusion_length_1"].value = 80.0
+    sample.parameters["diffusion_length_2"].value = 41.6
+    sample.parameters["diffusion_length_3"].value = 454.4
     sample.parameters["diffusion_length_epithermal"].value = 1
-
-    sample.parameters["lineshape_0"].vary = False
-    sample.parameters["lineshape_1"].vary = False
-    sample.parameters["lineshape_2"].vary = False
-    sample.parameters["lineshape_3"].vary = False
-    sample.parameters["lineshape_epithermal"].vary = False
-    sample.parameters["diffusion_length_1"].vary = False
-    sample.parameters["diffusion_length_2"].vary = False
-    sample.parameters["diffusion_length_3"].vary = False
-    sample.parameters["diffusion_length_epithermal"].vary = False
 
     sample.fit(e, s, ds, verbose=True)
     limpid.plot_result(sample, show_init=True)

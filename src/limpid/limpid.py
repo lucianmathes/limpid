@@ -189,9 +189,7 @@ class Layer:
 
         @cache
         def concentration_left(z, thickness, u, v, w):
-            if np.isinf(thickness):
-                cl = np.exp(-v * z)
-            elif w * thickness > 100:
+            if w * thickness > 100:
                 # avoid overflow in np.sinh
                 cl = np.exp(-v * z) * np.exp(-w * z)
             else:
