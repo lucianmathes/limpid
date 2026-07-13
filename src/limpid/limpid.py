@@ -520,7 +520,7 @@ class Sample:
                 z_is_in_current_layer = (z >= np.sum([l.thickness for l in self.layers[:i]]))
                 if i < len(self.layers):
                     z_is_in_current_layer &= (z < np.sum([l.thickness for l in self.layers[:i+1]]))
-                
+
                 if z_is_in_current_layer:
                     zz = z + offsets[i] - np.sum([l.thickness for l in self.layers[:i]])
                     plist.append(self.layers[i].implantation_profile(zz, implantation_energy))
@@ -666,6 +666,96 @@ class Sample:
 
         return ls_model
 
+    def prepare_fit(
+        self,
+        implantation_energies: np.ndarray,
+        lineshape: np.ndarray,
+        lineshape_deltas: np.ndarray|None = None,
+    ) -> None:
+        # Define a useful initial guess. Lineshape guesses are only used, if
+        # the value is set to inf. This avoids overwriting user defined values.
+        if (self.epithermal_correction
+            and self.parameters['lineshape_epithermal'].value == np.inf):
+            self.parameters['lineshape_epithermal'].value = lineshape[0]
+
+        last_layer = self.layers[-1]
+        if not np.isinf(last_layer.thickness):
+            wrn = (f'Invalid thickness ({last_layer.thickness}) for the '
+                    f'last layer ({last_layer.name}). Thickness set to '
+                    'inf.')
+            print(wrn)
+            last_layer.thickness = np.inf
+
+        self.initial_state = copy.deepcopy(self)
+
+        # Save input data to the sample object for later use (i.e., plots,
+        # output, etc.). If the sample object was already used to fit a
+        # dataset, raise an error to avoid problems caused by negligence.
+        if self.fit_status > -2:
+            err = ('Sample object was already used to fit a dataset. Please '
+                    'create a new Sample object.')
+            raise RuntimeError(err)
+        else:
+            self.measurement_energies = implantation_energies.copy()
+            self.measurement_lineshape = lineshape.copy()
+            if lineshape_deltas is not None:
+                self.measurement_lineshape_delta = lineshape_deltas.copy()
+
+        # TODO: Sort data by implantation energy
+
+        index = -1
+        stepsize = len(lineshape) // len(self.layers)
+        for layer in self.layers[::-1]:
+            if layer.lineshape == np.inf:
+                layer.lineshape = lineshape[index]
+            index -= stepsize
+
+        # Surface lineshape guess for the surface. If epithermal_correction
+        # is True, use a value between epithermal and first layer lineshape.
+        if self.surface.lineshape == np.inf:
+            if self.epithermal_correction:
+                self.surface.lineshape = (self.parameters['lineshape_epithermal'].value
+                                                + self.parameters['lineshape_1'].value) / 2
+            else:
+                self.surface.lineshape = lineshape[0]
+
+    def post_fit(
+        self,
+        result_params: lmfit.Parameters,
+        result_status: int,
+        fit_duration: float,
+        report_to: str = "./limpid-fit-report.txt",
+        verbose: int = 0,
+    ) -> None:
+        # update parameters object
+        self.parameters = result_params
+
+        try:
+            self.fit_status = result_status
+        except AttributeError:
+            # lmfit.minimizer.MinimizerResult has the parameter 'status' only
+            # defined in case of a successful fit.
+            self.fit_status = -1
+
+        if self.fit_status <= 0:
+            wrn = ('Fit did not succeed.')
+            print(wrn)
+        else:
+            msg = (f'\nFit duration: {fit_duration} s'
+                    '\nDiffusion length(s):')
+            for layer in self.layers:
+                diffusion_length_err = result_params[f'diffusion_length_{layer.index}'].stderr
+                msg += (f'\n- {layer.name}: '
+                        f'({np.round(layer.diffusion_length, self.precision)} '
+                        f'+/- {np.round(diffusion_length_err, self.precision)}'
+                         ') nm')
+            if verbose >= 1:
+                print(msg)
+            if report_to:
+                with open(report_to, 'w') as f:
+                    f.write(msg)
+        pass
+
     def fit(
         self,
         implantation_energies: np.ndarray,
@@ -699,53 +789,7 @@ class Sample:
         Raises:
           RuntimeError: Tried to fit the Sample object twice.
         """
-
-        # Define a useful initial guess. Lineshape guesses are only used, if
-        # the value is set to inf. This avoids overwriting user defined values.
-        if (self.epithermal_correction
-            and self.parameters['lineshape_epithermal'].value == np.inf):
-            self.parameters['lineshape_epithermal'].value = lineshape[0]
-
-        last_layer = self.layers[-1]
-        if not np.isinf(last_layer.thickness):
-            wrn = (f'Invalid thickness ({last_layer.thickness}) for the '
-                   f'last layer ({last_layer.name}). Thickness set to '
-                    'inf.')
-            print(wrn)
-            last_layer.thickness = np.inf
-
-        self.initial_state = copy.deepcopy(self)
-
-        # Save input data to the sample object for later use (i.e., plots,
-        # output, etc.). If the sample object was already used to fit a 
-        # dataset, raise an error to avoid problems caused by negligence.
-        if self.fit_status > -2:
-            err = ('Sample object was already used to fit a dataset. Please '
-                   'create a new Sample object.')
-            raise RuntimeError(err)
-        else:
-            self.measurement_energies = implantation_energies.copy()
-            self.measurement_lineshape = lineshape.copy()
-            if lineshape_deltas is not None:
-                self.measurement_lineshape_delta = lineshape_deltas.copy()
-
-        # TODO: Sort data by implantation energy
-
-        index = -1
-        stepsize = len(lineshape) // len(self.layers)
-        for layer in self.layers[::-1]:
-            if layer.lineshape == np.inf:
-                layer.lineshape = lineshape[index]
-            index -= stepsize
-
-        # Surface lineshape guess for the surface. If epithermal_correction
-        # is True, use a value between epithermal and first layer lineshape.
-        if self.surface.lineshape == np.inf:
-            if self.epithermal_correction:
-                self.surface.lineshape = (self.parameters['lineshape_epithermal'].value
-                                              + self.parameters['lineshape_1'].value) / 2
-            else:
-                self.surface.lineshape = lineshape[0]
+        self.prepare_fit(implantation_energies, lineshape, lineshape_deltas)
 
         def residuals(parameters, energies):
             """Residual function to be minimized by the fit."""
@@ -771,32 +815,139 @@ class Sample:
 
         fit_duration = np.round(time.time() - start_time, 5)
 
-        # update parameters object
-        self.parameters = fit_result.params
-
-        try:
-            self.fit_status = fit_result.status
-        except AttributeError:
-            # lmfit.minimizer.MinimizerResult has the parameter 'status' only
-            # defined in case of a successful fit.
-            self.fit_status = -1
-
-        if self.fit_status <= 0:
-            wrn = ('Fit did not succeed.')
-            print(wrn)
-        else:
-            msg = (f'\nFit duration: {fit_duration} s'
-                    '\nDiffusion length(s):')
-            for layer in self.layers:
-                diffusion_length_err = fit_result.params[f'diffusion_length_{layer.index}'].stderr
-                msg += (f'\n- {layer.name}: '
-                        f'({np.round(layer.diffusion_length, self.precision)} '
-                        f'+/- {np.round(diffusion_length_err, self.precision)}'
-                         ') nm')
-            if verbose >= 1:
-                print(msg)
-            if report_to:
-                with open(report_to, 'w') as f:
-                    f.write(msg)
+        self.post_fit(
+            fit_result.params,
+            fit_result.status,
+            fit_duration,
+            report_to,
+            verbose
+        )
 
         return fit_result
+
+
+def shared_fit(
+    samples: list[Sample],
+    implantation_energies: list[np.ndarray],
+    lineshapes: list[np.ndarray],
+    lineshape_deltas: list[np.ndarray] | None = None,
+    *,
+    shared_params: lmfit.Parameters,
+    report_to: str = "./limpid-fit-report.txt",
+    max_nfev: int = 200,
+    verbose: int = 0,
+    precision: int = 15,
+) -> None:
+    n_samples = len(samples)
+
+    err = (
+        f"Different numbers of samples and energies provided ({n_samples} "
+        f"and {len(implantation_energies)})"
+    )
+    assert len(implantation_energies) == n_samples, err
+
+    err = (
+        f"Different numbers of samples and lineshapes provided ({n_samples} "
+        f"and {len(lineshapes)})"
+    )
+    assert len(lineshapes) == n_samples, err
+
+    if lineshape_deltas is not None:
+        err = (
+            f"Different numbers of samples and lineshape deltas provided "
+            f"({n_samples} and {len(lineshape_deltas)})"
+        )
+        assert len(lineshape_deltas) == n_samples, err
+
+    for i, sample in enumerate(samples):
+        for shared_param in shared_params:
+            err = (
+                f"Sample {i+1} ({sample.name}) is missing shared parameter "
+                f"{shared_param}"
+            )
+            assert shared_param in sample.parameters, err
+
+    ## Shared model construction
+
+    parameters = copy.deepcopy(shared_params)
+
+    shared_p_names = list(parameters.keys())
+    separate_p_names = []
+
+    for i, sample in enumerate(samples):
+        sample.prepare_fit(
+            implantation_energies[i],
+            lineshapes[i],
+            None if lineshape_deltas is None else lineshape_deltas[i]
+        )
+
+        added_names = []
+        for param_name, param in sample.parameters.items():
+            if param_name in shared_p_names:
+                continue
+            param_name = f"s{i}__{param_name}"
+            parameters.add(
+                name = param_name,
+                value = param.value,
+                vary = param.vary,
+                min = param.min,
+                max = param.max,
+            )
+            added_names.append(param_name)
+        separate_p_names.append(shared_p_names + added_names)
+
+    def residuals(parameters, energies, lineshapes, lineshape_deltas, separate_p_names):
+        """Residual function to be minimized by the fit."""
+        diffs = []
+        for i, sample in enumerate(samples):
+            # update parameters used by the model_diffusion() method
+            for p_name in separate_p_names[i]:
+                p = p_name.split("__")[-1]
+                sample.parameters[p].value = parameters[p_name].value
+
+            diff = (sample.model_diffusion(energies[i]) - lineshapes[i])
+            if lineshape_deltas is not None:
+                diff /= lineshape_deltas[i]
+
+            diffs.append(diff)
+
+        return np.concat(diffs)
+
+    # Perform the actual fit
+    start_time = time.time()
+    mini = lmfit.Minimizer(
+        residuals,
+        parameters,
+        fcn_args=(
+            implantation_energies,
+            lineshapes,
+            lineshape_deltas,
+            separate_p_names,
+        ),
+        verbose=verbose
+    )
+
+    precision_exp = 10 ** (-precision)
+    shared_result = mini.least_squares(max_nfev=max_nfev, jac='2-point',
+                                    ftol=precision_exp, xtol=precision_exp,
+                                    gtol=precision_exp)
+
+    fit_duration = np.round(time.time() - start_time, 5)
+
+    for i, sample in enumerate(samples):
+        # TODO: create mini fit_result for every sample
+
+        params = lmfit.Parameters()
+
+        for p in separate_p_names[i]:
+            param = copy.deepcopy(shared_result.params[p])
+            param.name = param.name.split("__")[-1]
+            params.add(param)
+
+        sample.post_fit(
+            params,
+            shared_result.status,
+            fit_duration,
+            report_to,
+            verbose
+        )

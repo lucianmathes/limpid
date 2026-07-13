@@ -1,4 +1,4 @@
-from .limpid import Layer, Sample
+from .limpid import Layer, Sample, shared_fit
 from .visualize import (
     check_sample_status, plot_initial_guess, plot_result, plot_detailed_result,
     plot_fractions
