@@ -225,29 +225,38 @@ class Layer:
           Two numpy arrays, corresponding to the diffusion and annihilation
           rates used for the second part of the simulation.
         """
+        u = 1 / self.diffusion_length
 
-        exponential = self.thickness / self.diffusion_length
-        boltzmann_factor = np.exp(-self.positron_affinity
-                            / (BOLTZMANN_CONSTANT * self.temperature))
+        exponential = u * self.thickness
+        boltzmann_factor = np.exp(
+            -self.positron_affinity / (BOLTZMANN_CONSTANT * self.temperature)
+        )
+
         # The Boltzmann factor describes density. We need flux.
-        boltzmann_factor *= self.diffusion_coefficient / self.diffusion_length
+        boltzmann_factor *= self.diffusion_coefficient * u
 
-        # diffusion
         if exponential >= 700:
-            # exp(709) ~ 10^308 -> overflow
-            diffusion = 0
-
+            sinh = np.inf
+            tanh = 1
         elif exponential >= 30:
-            # exp(-30) ~ 10^-15 -> truncated, since negligible
-            diffusion = 2 * np.exp(- exponential) * boltzmann_factor
-
+            sinh = 0.5 * np.exp(exponential)
+            tanh = 1
         else:
-            diffusion = 1 / np.cosh(exponential) * boltzmann_factor
+            sinh = np.sinh(exponential)
+            tanh = np.tanh(exponential)
 
-        # annihilation
-        annihilation = boltzmann_factor - diffusion
+        # Notation J, N, A as in the paper
 
-        return diffusion, annihilation
+        if np.isinf(self.thickness):
+            J = 0.
+        else:
+            J = boltzmann_factor / sinh
+
+        N = boltzmann_factor / tanh
+
+        A = N - J
+
+        return J, A
 
 
 class Surface:
@@ -933,6 +942,10 @@ def shared_fit(
                                     gtol=precision_exp)
 
     fit_duration = np.round(time.time() - start_time, 5)
+
+    if shared_result.aborted:
+        print("Fit aborted")
+        quit()
 
     for i, sample in enumerate(samples):
         # TODO: create mini fit_result for every sample

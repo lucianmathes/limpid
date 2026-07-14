@@ -4,12 +4,18 @@ import lmfit
 # Silicon single crystal
 
 si = limpid.Layer(density=2.33, makhov_parameters=(2.48, 1.729, 1.99), name='Si')
-sample1 = limpid.Sample(si, epithermal_correction=True)
+x = limpid.Layer(density=2.33, makhov_parameters=(2.48, 1.729, 1.99), name='X', thickness=0.01)
+sample1 = limpid.Sample([x, si], epithermal_correction=True)
 
 e1, s1, ds1 = limpid.load_example_data('si')
 
 sample1.parameters["lineshape_0"].value = 0.635
 sample1.parameters["lineshape_1"].value = 0.666
+sample1.parameters["lineshape_1"].vary = False
+sample1.parameters["diffusion_length_1"].vary = False
+sample1.parameters["lineshape_2"].value = 0.666
+
+limpid.plot_initial_guess(sample1, e1, s1, ds1)
 
 # Cu on Si
 
@@ -32,7 +38,7 @@ sample2.parameters["thickness_1"].vary = True
 
 shared_params = lmfit.Parameters()
 
-shared_params.add("lineshape_0", 0.63)
+shared_params.add("lineshape_2", 0.63)
 
 limpid.shared_fit(
     [sample1, sample2], [e1, e2], [s1, s2], shared_params=shared_params
